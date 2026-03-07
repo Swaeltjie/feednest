@@ -264,6 +264,25 @@ html.theme-transitioning *::after {
 	            box-shadow 300ms var(--spring-smooth) !important;
 }
 
+/* ─── Article slide navigation ─── */
+@keyframes slideFromRight {
+	from { transform: translateX(40px); opacity: 0; }
+	to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideFromLeft {
+	from { transform: translateX(-40px); opacity: 0; }
+	to { transform: translateX(0); opacity: 1; }
+}
+
+.slide-from-right {
+	animation: slideFromRight var(--duration-smooth) var(--spring-smooth);
+}
+
+.slide-from-left {
+	animation: slideFromLeft var(--duration-smooth) var(--spring-smooth);
+}
+
 /* ─── Accent text selection ─── */
 ::selection {
   background: var(--color-accent-glow);

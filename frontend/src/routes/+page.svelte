@@ -595,7 +595,12 @@
 
 <!-- Article Reader Panel (Feedly-style slide-in) -->
 {#if openArticleId}
-	<ArticleReader articleId={openArticleId} onClose={closeArticle} />
+	<ArticleReader
+		articleId={openArticleId}
+		onClose={closeArticle}
+		articleIds={$articles.articles.map(a => a.id)}
+		onNavigate={(id) => { openArticleId = id; }}
+	/>
 {/if}
 
 <!-- Command Palette -->

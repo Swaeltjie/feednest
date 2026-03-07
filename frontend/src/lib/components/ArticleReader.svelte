@@ -9,9 +9,13 @@
 	let {
 		articleId,
 		onClose = () => {},
+		articleIds = [],
+		onNavigate,
 	}: {
 		articleId: number;
 		onClose?: () => void;
+		articleIds?: number[];
+		onNavigate?: (id: number) => void;
 	} = $props();
 
 	let article: Article | null = $state(null);
@@ -21,23 +25,72 @@
 	let starAnimating = $state(false);
 	let visible = $state(false);
 
-	onMount(async () => {
+	// Task 8: Reading progress
+	let readingProgress = $state(0);
+	let readerScrollY = $state(0);
+	let lastScrollY = 0;
+
+	// Task 9: Collapsing header
+	let readerHeaderCompact = $state(false);
+
+	// Task 10: Article navigation
+	let contentEl: HTMLElement;
+	let slideDirection = $state<'left' | 'right' | null>(null);
+
+	onMount(() => {
 		// Trigger slide-in animation
 		requestAnimationFrame(() => { visible = true; });
+	});
 
-		try {
-			article = await articles.getArticle(articleId);
-			if (article && !article.is_read) {
-				await articles.toggleRead(article.id, true);
-				article.is_read = true;
+	// Reactive article fetching - runs on mount and when articleId changes
+	$effect(() => {
+		const id = articleId;
+		loading = true;
+		error = '';
+		articles.getArticle(id).then((a) => {
+			article = a;
+			if (a && !a.is_read) {
+				articles.toggleRead(a.id, true);
+				a.is_read = true;
 			}
-			api.post('/api/events', { article_id: articleId, event_type: 'click', duration_seconds: 0 });
-		} catch (e) {
+			api.post('/api/events', { article_id: id, event_type: 'click', duration_seconds: 0 });
+		}).catch(() => {
 			error = 'Article not found';
-		} finally {
+		}).finally(() => {
 			loading = false;
+		});
+	});
+
+	// Reset state on article change (navigation)
+	$effect(() => {
+		if (articleId) {
+			if (contentEl) contentEl.scrollTop = 0;
+			readerHeaderCompact = false;
+			readingProgress = 0;
+			lastScrollY = 0;
+
+			if (slideDirection) {
+				setTimeout(() => { slideDirection = null; }, 300);
+			}
 		}
 	});
+
+	function handleReaderScroll(e: Event) {
+		const target = e.target as HTMLElement;
+		readerScrollY = target.scrollTop;
+
+		// Task 8: Progress bar
+		const scrollHeight = target.scrollHeight - target.clientHeight;
+		readingProgress = scrollHeight > 0 ? Math.min(100, (readerScrollY / scrollHeight) * 100) : 0;
+
+		// Task 9: Header collapse
+		if (readerScrollY > 120 && readerScrollY > lastScrollY) {
+			readerHeaderCompact = true;
+		} else if (readerScrollY < lastScrollY) {
+			readerHeaderCompact = false;
+		}
+		lastScrollY = readerScrollY;
+	}
 
 	function trackReadTime() {
 		if (article) {
@@ -79,7 +132,18 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') handleClose();
+		if (e.key === 'Escape') {
+			handleClose();
+		} else if ((e.key === 'j' || e.key === 'k') && articleIds.length > 0) {
+			const currentIdx = articleIds.indexOf(articleId);
+			if (currentIdx === -1) return;
+			const nextIdx = e.key === 'j' ? currentIdx + 1 : currentIdx - 1;
+			if (nextIdx >= 0 && nextIdx < articleIds.length) {
+				e.preventDefault();
+				slideDirection = e.key === 'j' ? 'left' : 'right';
+				onNavigate?.(articleIds[nextIdx]);
+			}
+		}
 	}
 </script>
 
@@ -100,6 +164,14 @@
 		{visible ? 'translate-x-0' : 'translate-x-full'}"
 	style="background: var(--color-surface);"
 >
+	<!-- Task 8: Reading progress bar -->
+	{#if visible && !loading && article}
+		<div
+			class="absolute top-0 left-0 z-10 h-0.5 reading-progress"
+			style="width: {readingProgress}%; transition: width 100ms linear;"
+		></div>
+	{/if}
+
 	{#if loading}
 		<div class="flex-1 flex items-center justify-center">
 			<div class="flex flex-col items-center gap-4 fade-in-up px-8 w-full max-w-md">
@@ -129,17 +201,23 @@
 			</div>
 		</div>
 	{:else if article}
-		<!-- Sticky header -->
-		<header class="flex-shrink-0 glass border-b border-[var(--color-border)]">
-			<div class="flex items-center justify-between px-5 py-3">
+		<!-- Task 9: Collapsing header -->
+		<header class="flex-shrink-0 glass border-b border-[var(--color-border)] transition-all"
+			style="transition: padding var(--duration-snappy) var(--spring-snappy);">
+			<div class="flex items-center justify-between px-5 {readerHeaderCompact ? 'py-1.5' : 'py-3'}"
+				style="transition: padding var(--duration-snappy) var(--spring-snappy);">
 				<button
 					onclick={handleClose}
-					class="flex items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors group"
+					class="flex items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors group min-w-0"
 				>
-					<svg class="w-5 h-5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<svg class="w-5 h-5 flex-shrink-0 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 					</svg>
-					Close
+					{#if readerHeaderCompact}
+						<span class="truncate max-w-[200px] text-[var(--color-text-primary)] font-medium">{article.title}</span>
+					{:else}
+						Close
+					{/if}
 				</button>
 
 				<div class="flex items-center gap-1.5">
@@ -173,8 +251,10 @@
 			</div>
 		</header>
 
-		<!-- Scrollable content -->
-		<div class="flex-1 overflow-y-auto">
+		<!-- Task 10: Scrollable content with slide animation -->
+		<div class="flex-1 overflow-y-auto {slideDirection === 'left' ? 'slide-from-right' : slideDirection === 'right' ? 'slide-from-left' : ''}"
+			bind:this={contentEl}
+			onscroll={handleReaderScroll}>
 			<!-- Hero image -->
 			{#if article.thumbnail_url}
 				<div class="relative w-full h-56 overflow-hidden">

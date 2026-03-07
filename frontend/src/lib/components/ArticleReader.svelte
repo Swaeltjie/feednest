@@ -42,7 +42,7 @@
 	let article: Article | null = $state(null);
 	let loading = $state(true);
 	let error = $state('');
-	let startTime = Date.now();
+	let startTime = $state(Date.now());
 	let starAnimating = $state(false);
 
 	// Task 8: Reading progress
@@ -83,6 +83,7 @@
 			readerHeaderCompact = false;
 			readingProgress = 0;
 			lastScrollY = 0;
+			startTime = Date.now();
 
 			if (slideDirection) {
 				setTimeout(() => { slideDirection = null; }, 300);
@@ -167,7 +168,7 @@
 	}
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 <!-- Reader panel -->
 <div

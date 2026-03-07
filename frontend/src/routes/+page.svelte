@@ -205,6 +205,7 @@
 
 		cleanupKeyboard = setupKeyboardShortcuts({
 			j: (e) => {
+				if (openArticleId) return; // ArticleReader handles j/k when open
 				const articleList = $articles.articles;
 				if (articleList.length > 0) {
 					selectedIndex = Math.min(selectedIndex + 1, articleList.length - 1);
@@ -212,6 +213,7 @@
 				}
 			},
 			k: (e) => {
+				if (openArticleId) return; // ArticleReader handles j/k when open
 				if (selectedIndex > 0) {
 					selectedIndex = selectedIndex - 1;
 					scrollSelectedIntoView();
@@ -224,13 +226,8 @@
 				}
 			},
 			escape: (e) => {
-				if (openArticleId) {
+				if (openArticleId && !focusMode) {
 					closeArticle();
-				}
-			},
-			f: (e) => {
-				if (openArticleId) {
-					focusMode = !focusMode;
 				}
 			},
 			s: (e) => {

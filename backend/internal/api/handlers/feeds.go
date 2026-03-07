@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -79,8 +80,14 @@ func (h *FeedHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
 	var req models.UpdateFeedRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
 		return
 	}
@@ -96,6 +103,14 @@ func (h *FeedHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check if category_id was explicitly set to null (uncategorize)
+	var raw map[string]json.RawMessage
+	json.Unmarshal(bodyBytes, &raw)
+	clearCategory := false
+	if catRaw, exists := raw["category_id"]; exists && string(catRaw) == "null" {
+		clearCategory = true
+	}
+
 	if req.CategoryID != nil {
 		if _, err := h.store.GetCategory(*req.CategoryID, userID); err != nil {
 			http.Error(w, `{"error":"category not found"}`, http.StatusBadRequest)
@@ -106,6 +121,13 @@ func (h *FeedHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.UpdateFeed(id, userID, &req); err != nil {
 		http.Error(w, `{"error":"failed to update feed"}`, http.StatusInternalServerError)
 		return
+	}
+
+	if clearCategory {
+		if err := h.store.ClearFeedCategory(id, userID); err != nil {
+			http.Error(w, `{"error":"failed to clear category"}`, http.StatusInternalServerError)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

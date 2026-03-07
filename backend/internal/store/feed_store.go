@@ -95,6 +95,11 @@ func (q *Queries) UpdateFeedLastFetched(id int64) error {
 	return err
 }
 
+func (q *Queries) ClearFeedCategory(id, userID int64) error {
+	_, err := q.db.Exec("UPDATE feeds SET category_id = NULL WHERE id = ? AND user_id = ?", id, userID)
+	return err
+}
+
 func (q *Queries) DeleteFeed(id, userID int64) error {
 	_, err := q.db.Exec("DELETE FROM feeds WHERE id = ? AND user_id = ?", id, userID)
 	return err

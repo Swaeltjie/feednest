@@ -1,13 +1,16 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+
 	let { value }: { value: number } = $props();
 
 	let displayValue = $state(value);
 
 	$effect(() => {
 		const target = value;
-		if (target === displayValue) return;
-		const step = target > displayValue ? 1 : -1;
-		const diff = Math.abs(target - displayValue);
+		const current = untrack(() => displayValue);
+		if (target === current) return;
+		const step = target > current ? 1 : -1;
+		const diff = Math.abs(target - current);
 		const intervalMs = Math.max(20, Math.min(80, 400 / diff));
 		const interval = setInterval(() => {
 			displayValue += step;

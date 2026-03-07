@@ -67,13 +67,19 @@ func (q *Queries) GetFeed(id, userID int64) (*models.Feed, error) {
 
 func (q *Queries) UpdateFeed(id, userID int64, req *models.UpdateFeedRequest) error {
 	if req.Title != nil {
-		q.db.Exec("UPDATE feeds SET title = ? WHERE id = ? AND user_id = ?", *req.Title, id, userID)
+		if _, err := q.db.Exec("UPDATE feeds SET title = ? WHERE id = ? AND user_id = ?", *req.Title, id, userID); err != nil {
+			return err
+		}
 	}
 	if req.CategoryID != nil {
-		q.db.Exec("UPDATE feeds SET category_id = ? WHERE id = ? AND user_id = ?", *req.CategoryID, id, userID)
+		if _, err := q.db.Exec("UPDATE feeds SET category_id = ? WHERE id = ? AND user_id = ?", *req.CategoryID, id, userID); err != nil {
+			return err
+		}
 	}
 	if req.FetchInterval != nil {
-		q.db.Exec("UPDATE feeds SET fetch_interval = ? WHERE id = ? AND user_id = ?", *req.FetchInterval, id, userID)
+		if _, err := q.db.Exec("UPDATE feeds SET fetch_interval = ? WHERE id = ? AND user_id = ?", *req.FetchInterval, id, userID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -119,14 +125,23 @@ type FeedMetadataUpdate struct {
 }
 
 func (q *Queries) UpdateFeedMetadata(id int64, update *FeedMetadataUpdate) error {
+	if update == nil {
+		return nil
+	}
 	if update.Title != nil {
-		q.db.Exec("UPDATE feeds SET title = ? WHERE id = ?", *update.Title, id)
+		if _, err := q.db.Exec("UPDATE feeds SET title = ? WHERE id = ?", *update.Title, id); err != nil {
+			return err
+		}
 	}
 	if update.SiteURL != nil {
-		q.db.Exec("UPDATE feeds SET site_url = ? WHERE id = ?", *update.SiteURL, id)
+		if _, err := q.db.Exec("UPDATE feeds SET site_url = ? WHERE id = ?", *update.SiteURL, id); err != nil {
+			return err
+		}
 	}
 	if update.IconURL != nil {
-		q.db.Exec("UPDATE feeds SET icon_url = ? WHERE id = ?", *update.IconURL, id)
+		if _, err := q.db.Exec("UPDATE feeds SET icon_url = ? WHERE id = ?", *update.IconURL, id); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -9,7 +9,7 @@ interface SettingsState {
 function createSettingsStore() {
 	const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('feednest_theme') : null;
 	const initial: SettingsState = {
-		theme: (stored as Theme) || 'system',
+		theme: (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'system',
 	};
 
 	const { subscribe, update } = writable<SettingsState>(initial);

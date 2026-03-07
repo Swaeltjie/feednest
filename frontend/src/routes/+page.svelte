@@ -148,7 +148,7 @@
 			await feeds.load();
 			await categories.load();
 			showAddFeedModal = false;
-			articles.load(currentFilters);
+			await articles.load(currentFilters);
 		} catch (err) {
 			addFeedError = err instanceof Error ? err.message : 'Failed to add feed';
 		} finally {
@@ -256,7 +256,7 @@
 		articles.load(filters);
 	});
 
-	let pageTitle = $derived(() => {
+	let pageTitle = $derived.by(() => {
 		if (sidebarView === 'starred') return 'Starred';
 		if (sidebarView === 'feed' && activeFeedId) {
 			const feed = $feeds.find((f) => f.id === activeFeedId);
@@ -271,7 +271,7 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle()} - FeedNest</title>
+	<title>{pageTitle} - FeedNest</title>
 </svelte:head>
 
 <div class="flex h-screen" style="background: var(--color-surface);">

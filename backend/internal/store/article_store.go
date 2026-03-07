@@ -197,16 +197,20 @@ func (q *Queries) UpdateArticle(id, userID int64, isRead *bool, isStarred *bool)
 		if *isRead {
 			readAt = time.Now()
 		}
-		q.db.Exec(`
+		if _, err := q.db.Exec(`
 			UPDATE articles SET is_read = ?, read_at = ?
 			WHERE id = ? AND feed_id IN (SELECT id FROM feeds WHERE user_id = ?)`,
-			*isRead, readAt, id, userID)
+			*isRead, readAt, id, userID); err != nil {
+			return err
+		}
 	}
 	if isStarred != nil {
-		q.db.Exec(`
+		if _, err := q.db.Exec(`
 			UPDATE articles SET is_starred = ?
 			WHERE id = ? AND feed_id IN (SELECT id FROM feeds WHERE user_id = ?)`,
-			*isStarred, id, userID)
+			*isStarred, id, userID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

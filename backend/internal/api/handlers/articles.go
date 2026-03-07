@@ -119,8 +119,14 @@ func (h *ArticleHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
 	}
 
 	isRead := true
-	h.store.UpdateArticle(id, userID, &isRead, nil)
-	h.store.CreateReadingEvent(id, "dismiss", 0)
+	if err := h.store.UpdateArticle(id, userID, &isRead, nil); err != nil {
+		http.Error(w, `{"error":"failed to dismiss article"}`, http.StatusInternalServerError)
+		return
+	}
+	if err := h.store.CreateReadingEvent(id, "dismiss", 0); err != nil {
+		http.Error(w, `{"error":"failed to create dismiss event"}`, http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

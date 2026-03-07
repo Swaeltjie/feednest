@@ -129,8 +129,16 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, _ := generateAccessToken(user.ID, h.jwtSecret, 24*time.Hour)
-	refreshToken, _ := generateAccessToken(user.ID, h.jwtSecret, 7*24*time.Hour)
+	accessToken, err := generateAccessToken(user.ID, h.jwtSecret, 24*time.Hour)
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+	refreshToken, err := generateAccessToken(user.ID, h.jwtSecret, 7*24*time.Hour)
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
 
 	resp := models.AuthResponse{
 		AccessToken:  accessToken,
@@ -157,7 +165,11 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, _ := generateAccessToken(claims.UserID, h.jwtSecret, 24*time.Hour)
+	accessToken, err := generateAccessToken(claims.UserID, h.jwtSecret, 24*time.Hour)
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"access_token": accessToken})

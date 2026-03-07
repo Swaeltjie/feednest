@@ -59,7 +59,7 @@
 		onSwipeLeft: () => onToggleStar?.(article.id, !article.is_starred),
 		threshold: 80
 	}}
-	class="group flex items-start gap-4 px-4 py-3.5 transition-all duration-200 fade-in-up
+	class="group flex items-start gap-4 px-4 py-3.5 transition-all duration-200 spring-in
 		border-b border-[var(--color-border)]
 		hover:bg-[var(--color-elevated)] hover:shadow-md
 		{article.is_read ? 'opacity-60 hover:opacity-90' : ''}

@@ -563,7 +563,7 @@
 					<div style="background: var(--color-card);" class="rounded-t-2xl mx-2 mt-2">
 						{#each listArticles as article, i (article.id)}
 							<div data-article-index={$articles.articles.indexOf(article)}>
-								<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
+								<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
 							</div>
 						{/each}
 					</div>
@@ -583,7 +583,7 @@
 					<div style="background: var(--color-card);" class="m-2 rounded-2xl overflow-hidden">
 						{#each $articles.articles as article, i (article.id)}
 							<div data-article-index={i}>
-								<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
+								<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
 							</div>
 						{/each}
 					</div>

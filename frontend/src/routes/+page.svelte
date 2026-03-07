@@ -6,6 +6,7 @@
 	import ArticleReader from '$lib/components/ArticleReader.svelte';
 	import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import { articles, type ArticleFilters } from '$lib/stores/articles';
 	import { feeds, categories } from '$lib/stores/feeds';
 	import { api } from '$lib/api/client';
@@ -42,6 +43,7 @@
 	let refreshCountdown = $state(300);
 	let refreshInterval: ReturnType<typeof setInterval> | undefined;
 	let countdownInterval: ReturnType<typeof setInterval> | undefined;
+	let commandPaletteOpen = $state(false);
 	let scrollY = $state(0);
 	let headerCompact = $derived(scrollY > 80);
 
@@ -246,7 +248,7 @@
 				}
 			},
 			'cmd+k': (e) => {
-				// Will be wired to command palette in Task 6
+				commandPaletteOpen = !commandPaletteOpen;
 			},
 			'?': (e) => {
 				// Will be wired to keyboard hints in Task 7
@@ -593,6 +595,16 @@
 {#if openArticleId}
 	<ArticleReader articleId={openArticleId} onClose={closeArticle} />
 {/if}
+
+<!-- Command Palette -->
+<CommandPalette
+	bind:open={commandPaletteOpen}
+	onSelectFeed={selectFeed}
+	onSelectCategory={selectCategory}
+	onSelectAll={selectAll}
+	onSelectStarred={selectStarred}
+	onRefresh={async () => { refreshCountdown = 300; await feeds.load(); await articles.load(currentFilters); }}
+/>
 
 <!-- Add Feed Modal -->
 {#if showAddFeedModal}

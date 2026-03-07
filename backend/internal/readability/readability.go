@@ -44,15 +44,15 @@ func ExtractContent(articleURL string) (string, error) {
 	}
 
 	content := article.Content
-	if isBlockedContent(content) {
+	if IsBlockedContent(content) {
 		return "", fmt.Errorf("content appears to be a bot-protection page for %s", articleURL)
 	}
 
 	return content, nil
 }
 
-// isBlockedContent detects Cloudflare, cookie walls, and other bot-protection pages.
-func isBlockedContent(content string) bool {
+// IsBlockedContent detects Cloudflare, cookie walls, and other bot-protection pages.
+func IsBlockedContent(content string) bool {
 	lower := strings.ToLower(content)
 	markers := []string{
 		"please enable cookies",

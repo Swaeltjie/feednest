@@ -14,6 +14,10 @@ var htmlTagRe = regexp.MustCompile(`<[^>]*>`)
 func makeSnippet(html string, maxLen int) string {
 	text := htmlTagRe.ReplaceAllString(html, "")
 	text = strings.Join(strings.Fields(text), " ")
+	// Filter out blocked/bot-protection content from snippets
+	if isSnippetBlocked(text) {
+		return ""
+	}
 	if len(text) > maxLen {
 		text = text[:maxLen]
 		if i := strings.LastIndex(text, " "); i > maxLen-40 {
@@ -22,6 +26,26 @@ func makeSnippet(html string, maxLen int) string {
 		text += "\u2026"
 	}
 	return text
+}
+
+func isSnippetBlocked(text string) bool {
+	lower := strings.ToLower(text)
+	markers := []string{
+		"please enable cookies",
+		"you have been blocked",
+		"cloudflare ray id",
+		"please enable js and disable any ad blocker",
+		"403 forbidden",
+		"access denied",
+		"robot sensors",
+		"security service to protect itself",
+	}
+	for _, m := range markers {
+		if strings.Contains(lower, m) {
+			return true
+		}
+	}
+	return false
 }
 
 type ArticleFilter struct {
@@ -59,6 +83,13 @@ func (q *Queries) GetArticle(id, userID int64) (*models.Article, error) {
 		&a.IsRead, &a.IsStarred, &a.ReadAt, &a.Score, &a.FeedTitle, &a.FeedIconURL)
 	if err != nil {
 		return nil, err
+	}
+	// Clear blocked content so reader doesn't display it
+	if isSnippetBlocked(a.ContentClean) {
+		a.ContentClean = ""
+	}
+	if isSnippetBlocked(a.ContentRaw) {
+		a.ContentRaw = ""
 	}
 	return &a, nil
 }
@@ -123,7 +154,7 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 
 	offset := (filter.Page - 1) * filter.Limit
 	query := fmt.Sprintf(`
-		SELECT a.id, a.feed_id, a.guid, a.title, a.url, a.author, '', a.content_clean,
+		SELECT a.id, a.feed_id, a.guid, a.title, a.url, a.author, a.content_raw, a.content_clean,
 			a.thumbnail_url, a.published_at, a.fetched_at, a.word_count, a.reading_time,
 			a.is_read, a.is_starred, a.read_at, a.score,
 			COALESCE(f.title, '') as feed_title, COALESCE(f.icon_url, '') as feed_icon_url
@@ -148,8 +179,13 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 			&a.IsRead, &a.IsStarred, &a.ReadAt, &a.Score, &a.FeedTitle, &a.FeedIconURL); err != nil {
 			return nil, 0, err
 		}
-		a.Snippet = makeSnippet(a.ContentClean, 160)
+		snippet := makeSnippet(a.ContentClean, 160)
+		if snippet == "" {
+			snippet = makeSnippet(a.ContentRaw, 160)
+		}
+		a.Snippet = snippet
 		a.ContentClean = ""
+		a.ContentRaw = ""
 		articles = append(articles, a)
 	}
 	return articles, total, nil

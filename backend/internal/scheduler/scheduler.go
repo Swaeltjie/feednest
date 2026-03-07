@@ -65,6 +65,12 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
 
 		for _, item := range result.Items {
 			thumbnailURL := item.ThumbnailURL
+			contentRaw := item.ContentRaw
+
+			// Sanitize blocked content from RSS raw content
+			if readability.IsBlockedContent(contentRaw) {
+				contentRaw = ""
+			}
 
 			var contentClean string
 			if item.URL != "" {
@@ -78,7 +84,7 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
 
 			s.store.CreateArticle(
 				feedID, item.GUID, item.Title, item.URL, item.Author,
-				item.ContentRaw, contentClean, thumbnailURL,
+				contentRaw, contentClean, thumbnailURL,
 				item.PublishedAt, item.WordCount, item.ReadingTime,
 			)
 		}
@@ -132,6 +138,12 @@ func (s *Scheduler) fetchAll() {
 
 			for _, item := range result.Items {
 				thumbnailURL := item.ThumbnailURL
+				contentRaw := item.ContentRaw
+
+				// Sanitize blocked content from RSS raw content
+				if readability.IsBlockedContent(contentRaw) {
+					contentRaw = ""
+				}
 
 				var contentClean string
 				if item.URL != "" {
@@ -145,7 +157,7 @@ func (s *Scheduler) fetchAll() {
 
 				s.store.CreateArticle(
 					feedID, item.GUID, item.Title, item.URL, item.Author,
-					item.ContentRaw, contentClean, thumbnailURL,
+					contentRaw, contentClean, thumbnailURL,
 					item.PublishedAt, item.WordCount, item.ReadingTime,
 				)
 			}

@@ -1,11 +1,13 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import ArticleCard from '$lib/components/ArticleCard.svelte';
 	import ArticleList from '$lib/components/ArticleList.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { articles, type ArticleFilters } from '$lib/stores/articles';
 	import { feeds, categories } from '$lib/stores/feeds';
+	import { setupKeyboardShortcuts } from '$lib/utils/keyboard';
 
 	type ViewMode = 'cards' | 'list';
 	type FilterTab = 'all' | 'unread' | 'starred';
@@ -29,6 +31,8 @@
 	let addingFeed = $state(false);
 	let addFeedError = $state('');
 	let initialized = $state(false);
+	let selectedIndex = $state(-1);
+	let cleanupKeyboard: (() => void) | undefined;
 
 	let currentFilters = $derived<ArticleFilters>({
 		status: filterTab === 'unread' ? 'unread' : filterTab === 'starred' ? 'starred' : undefined,
@@ -106,6 +110,62 @@
 		} finally {
 			initialized = true;
 		}
+
+		cleanupKeyboard = setupKeyboardShortcuts({
+			j: () => {
+				const articleList = $articles.articles;
+				if (articleList.length > 0) {
+					selectedIndex = Math.min(selectedIndex + 1, articleList.length - 1);
+				}
+			},
+			k: () => {
+				if (selectedIndex > 0) {
+					selectedIndex = selectedIndex - 1;
+				}
+			},
+			enter: () => {
+				const articleList = $articles.articles;
+				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
+					goto(`/article/${articleList[selectedIndex].id}`);
+				}
+			},
+			s: () => {
+				const articleList = $articles.articles;
+				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
+					const a = articleList[selectedIndex];
+					articles.toggleStar(a.id, !a.is_starred);
+				}
+			},
+			m: () => {
+				const articleList = $articles.articles;
+				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
+					const a = articleList[selectedIndex];
+					articles.toggleRead(a.id, !a.is_read);
+				}
+			},
+			d: () => {
+				const articleList = $articles.articles;
+				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
+					articles.dismiss(articleList[selectedIndex].id);
+					if (selectedIndex >= articleList.length - 1) {
+						selectedIndex = Math.max(0, articleList.length - 2);
+					}
+				}
+			},
+			v: () => {
+				setViewMode(viewMode === 'cards' ? 'list' : 'cards');
+			},
+			'/': () => {
+				const searchInput = document.querySelector<HTMLInputElement>('input[type="search"], input[placeholder*="earch"]');
+				if (searchInput) {
+					searchInput.focus();
+				}
+			},
+		});
+	});
+
+	onDestroy(() => {
+		cleanupKeyboard?.();
 	});
 
 	$effect(() => {
@@ -362,15 +422,15 @@
 				<div
 					class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4"
 				>
-					{#each $articles.articles as article (article.id)}
-						<ArticleCard {article} />
+					{#each $articles.articles as article, i (article.id)}
+						<ArticleCard {article} selected={i === selectedIndex} />
 					{/each}
 				</div>
 			{:else}
 				<!-- List view -->
 				<div class="bg-white dark:bg-gray-800">
-					{#each $articles.articles as article (article.id)}
-						<ArticleList {article} />
+					{#each $articles.articles as article, i (article.id)}
+						<ArticleList {article} selected={i === selectedIndex} />
 					{/each}
 				</div>
 			{/if}

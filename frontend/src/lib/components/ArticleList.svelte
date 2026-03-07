@@ -3,7 +3,7 @@
 	import { articles } from '$lib/stores/articles';
 	import { timeAgo } from '$lib/utils/time';
 
-	let { article }: { article: Article } = $props();
+	let { article, selected = false }: { article: Article; selected?: boolean } = $props();
 
 	function handleStar(e: Event) {
 		e.preventDefault();
@@ -14,7 +14,7 @@
 
 <a
 	href="/article/{article.id}"
-	class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors {article.is_read ? 'opacity-60' : ''}"
+	class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors {article.is_read ? 'opacity-60' : ''} {selected ? 'bg-blue-50 dark:bg-blue-900/20 ring-2 ring-inset ring-blue-500/30' : ''}"
 >
 	<div class="w-2 h-2 rounded-full flex-shrink-0 {article.is_read ? 'bg-transparent' : 'bg-blue-500'}"></div>
 

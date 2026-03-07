@@ -2,11 +2,27 @@ package store
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/feednest/backend/internal/models"
 )
+
+var htmlTagRe = regexp.MustCompile(`<[^>]*>`)
+
+func makeSnippet(html string, maxLen int) string {
+	text := htmlTagRe.ReplaceAllString(html, "")
+	text = strings.Join(strings.Fields(text), " ")
+	if len(text) > maxLen {
+		text = text[:maxLen]
+		if i := strings.LastIndex(text, " "); i > maxLen-40 {
+			text = text[:i]
+		}
+		text += "\u2026"
+	}
+	return text
+}
 
 type ArticleFilter struct {
 	CategoryID *int64
@@ -94,7 +110,7 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 
 	offset := (filter.Page - 1) * filter.Limit
 	query := fmt.Sprintf(`
-		SELECT a.id, a.feed_id, a.guid, a.title, a.url, a.author, '', '',
+		SELECT a.id, a.feed_id, a.guid, a.title, a.url, a.author, '', a.content_clean,
 			a.thumbnail_url, a.published_at, a.fetched_at, a.word_count, a.reading_time,
 			a.is_read, a.is_starred, a.read_at, a.score,
 			COALESCE(f.title, '') as feed_title, COALESCE(f.icon_url, '') as feed_icon_url
@@ -119,6 +135,8 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 			&a.IsRead, &a.IsStarred, &a.ReadAt, &a.Score, &a.FeedTitle, &a.FeedIconURL); err != nil {
 			return nil, 0, err
 		}
+		a.Snippet = makeSnippet(a.ContentClean, 160)
+		a.ContentClean = ""
 		articles = append(articles, a)
 	}
 	return articles, total, nil

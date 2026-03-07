@@ -36,6 +36,26 @@ func TestArticleStore_CreateAndList(t *testing.T) {
 	}
 }
 
+func TestMakeSnippet(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		maxLen int
+	}{
+		{"strips HTML", "<p>Hello <b>world</b></p>", 100},
+		{"empty input", "", 100},
+		{"collapses whitespace", "hello   \n  world", 100},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := makeSnippet(tt.input, tt.maxLen)
+			if len(got) > tt.maxLen+5 {
+				t.Errorf("snippet too long: got %d chars, max %d", len(got), tt.maxLen)
+			}
+		})
+	}
+}
+
 func TestArticleStore_MarkReadAndStar(t *testing.T) {
 	q := setupTestDB(t)
 	userID := createTestUser(t, q)

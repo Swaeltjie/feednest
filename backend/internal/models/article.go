@@ -11,6 +11,7 @@ type Article struct {
 	Author       string     `json:"author"`
 	ContentRaw   string     `json:"content_raw,omitempty"`
 	ContentClean string     `json:"content_clean,omitempty"`
+	Snippet      string     `json:"snippet,omitempty"`
 	ThumbnailURL string     `json:"thumbnail_url"`
 	PublishedAt  *time.Time `json:"published_at"`
 	FetchedAt    time.Time  `json:"fetched_at"`

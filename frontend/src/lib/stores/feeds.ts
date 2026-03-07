@@ -9,6 +9,7 @@ export interface Feed {
 	icon_url: string;
 	category_id: number | null;
 	unread_count: number;
+	last_error: string | null;
 }
 
 export interface Category {
@@ -37,6 +38,9 @@ function createFeedsStore() {
 		async update(id: number, data: { title?: string; category_id?: number | null }) {
 			await api.put(`/api/feeds/${id}`, data);
 			await this.load();
+		},
+		async retry(id: number) {
+			await api.post(`/api/feeds/${id}/retry`);
 		},
 	};
 }

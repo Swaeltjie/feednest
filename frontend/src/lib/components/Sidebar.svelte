@@ -314,6 +314,12 @@
 									{/if}
 									<span class="truncate">{feed.title}</span>
 								</span>
+								{#if feed.last_error}
+									<span
+										class="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0"
+										title={feed.last_error}
+									></span>
+								{/if}
 								{#if feed.unread_count > 0}
 									<span class="ml-2 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
 										<AnimatedCount value={feed.unread_count} />
@@ -362,6 +368,12 @@
 							{/if}
 							<span class="truncate">{feed.title}</span>
 						</span>
+						{#if feed.last_error}
+							<span
+								class="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0"
+								title={feed.last_error}
+							></span>
+						{/if}
 						{#if feed.unread_count > 0}
 							<span class="ml-2 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
 								<AnimatedCount value={feed.unread_count} />
@@ -402,6 +414,17 @@
 		class="fixed z-[100] py-1.5 rounded-xl shadow-2xl min-w-[160px] glass border border-[var(--color-border-hover)] fade-in-up"
 		style="left: {contextMenu.x}px; top: {contextMenu.y}px; animation-duration: 100ms;"
 	>
+		{#if contextMenu?.feed.last_error}
+			<button
+				onclick={() => { if (contextMenu) { feeds.retry(contextMenu.feed.id); closeContextMenu(); } }}
+				class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] transition-colors"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+				</svg>
+				Retry Fetch
+			</button>
+		{/if}
 		<button
 			onclick={() => contextMenu && handleDeleteFeed(contextMenu.feed)}
 			class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"

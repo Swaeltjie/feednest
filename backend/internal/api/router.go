@@ -72,6 +72,10 @@ func NewRouter(queries *store.Queries, jwtSecret string) http.Handler {
 		settingsH := handlers.NewSettingsHandler(queries)
 		r.Get("/api/settings", settingsH.Get)
 		r.Put("/api/settings", settingsH.Update)
+
+		opmlH := handlers.NewOPMLHandler(queries)
+		r.Post("/api/opml/import", opmlH.Import)
+		r.Get("/api/opml/export", opmlH.Export)
 	})
 
 	return r

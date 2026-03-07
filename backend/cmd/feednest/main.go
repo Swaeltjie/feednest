@@ -4,8 +4,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/feednest/backend/internal/api"
+	"github.com/feednest/backend/internal/scheduler"
 	"github.com/feednest/backend/internal/store"
 )
 
@@ -34,6 +36,10 @@ func main() {
 
 	queries := store.New(db)
 	router := api.NewRouter(queries, jwtSecret)
+
+	sched := scheduler.New(queries, 5*time.Minute)
+	sched.Start()
+	defer sched.Stop()
 
 	log.Printf("FeedNest backend starting on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))

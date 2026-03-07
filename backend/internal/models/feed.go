@@ -20,6 +20,7 @@ type Feed struct {
 type CreateFeedRequest struct {
 	URL           string `json:"url"`
 	CategoryID    *int64 `json:"category_id,omitempty"`
+	NewCategory   string `json:"new_category,omitempty"`
 	FetchInterval int    `json:"fetch_interval,omitempty"`
 }
 

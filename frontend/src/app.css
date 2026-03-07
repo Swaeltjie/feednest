@@ -181,3 +181,62 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-tertiary);
 }
+
+/* ─── Pulse glow for unread indicators ─── */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 4px var(--color-accent), 0 0 8px transparent; }
+  50% { box-shadow: 0 0 8px var(--color-accent), 0 0 16px var(--color-accent-glow); }
+}
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* ─── Gradient border animation ─── */
+@keyframes borderGlow {
+  0%, 100% { border-color: var(--color-accent); }
+  50% { border-color: var(--color-accent-end); }
+}
+
+/* ─── Floating label effect for inputs ─── */
+input:focus, select:focus {
+  box-shadow: 0 0 0 3px var(--color-accent-glow), 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ─── Enhanced card hover with glow ─── */
+.glass-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--color-accent-glow);
+}
+.dark .glass-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 1px 1px rgba(59, 130, 246, 0.15);
+}
+
+/* ─── Smooth page transitions ─── */
+@keyframes contentFadeIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.content-fade-in {
+  animation: contentFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ─── Reading progress bar ─── */
+.reading-progress {
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-end));
+  height: 2px;
+  transition: width 0.3s ease;
+}
+
+/* ─── Hover lift for interactive elements ─── */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ─── Accent text selection ─── */
+::selection {
+  background: var(--color-accent-glow);
+  color: var(--color-text-primary);
+}

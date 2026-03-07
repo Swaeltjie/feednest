@@ -35,6 +35,7 @@ export interface ArticleFilters {
 	feed?: number;
 	category?: number;
 	tag?: string;
+	search?: string;
 	page?: number;
 }
 
@@ -56,6 +57,7 @@ function createArticlesStore() {
 			if (filters.feed) params.set('feed', String(filters.feed));
 			if (filters.category) params.set('category', String(filters.category));
 			if (filters.tag) params.set('tag', filters.tag);
+			if (filters.search) params.set('search', filters.search);
 			if (filters.page) params.set('page', String(filters.page));
 
 			const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);

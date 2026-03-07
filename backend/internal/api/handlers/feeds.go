@@ -48,6 +48,14 @@ func (h *FeedHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If new_category is provided, create it first
+	if req.NewCategory != "" {
+		cat, err := h.store.CreateCategory(userID, req.NewCategory, 0)
+		if err == nil {
+			req.CategoryID = &cat.ID
+		}
+	}
+
 	feed, err := h.store.CreateFeed(userID, req.URL, "", "", "", req.CategoryID)
 	if err != nil {
 		http.Error(w, `{"error":"failed to create feed or URL already exists"}`, http.StatusConflict)

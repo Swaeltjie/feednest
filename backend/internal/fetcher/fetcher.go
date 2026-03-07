@@ -109,6 +109,17 @@ func FetchFeed(url string) (*FeedResult, error) {
 		fi.WordCount = countWords(content)
 		fi.ReadingTime = int(math.Ceil(float64(fi.WordCount) / 200.0))
 
+		// Skip sponsored/ad content
+		titleLower := strings.ToLower(fi.Title)
+		if strings.Contains(titleLower, "[sponsored]") ||
+			strings.Contains(titleLower, "[ad]") ||
+			strings.Contains(titleLower, "sponsored post") ||
+			strings.Contains(titleLower, "advertisement") ||
+			strings.Contains(titleLower, "| sponsored") ||
+			strings.Contains(titleLower, "- sponsored") {
+			continue
+		}
+
 		result.Items = append(result.Items, fi)
 	}
 

@@ -49,6 +49,9 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.ParseInt(catID, 10, 64)
 		filter.CategoryID = &id
 	}
+	if search := r.URL.Query().Get("search"); search != "" {
+		filter.Search = search
+	}
 
 	articles, total, err := h.store.ListArticles(userID, filter)
 	if err != nil {

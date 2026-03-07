@@ -8,6 +8,7 @@
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { articles, type ArticleFilters } from '$lib/stores/articles';
 	import { feeds, categories } from '$lib/stores/feeds';
+	import { api } from '$lib/api/client';
 	import { setupKeyboardShortcuts } from '$lib/utils/keyboard';
 
 	type ViewMode = 'hybrid' | 'cards' | 'list';
@@ -30,7 +31,10 @@
 	let feedUrl = $state('');
 	let feedCategoryId = $state<number | undefined>(undefined);
 	let addingFeed = $state(false);
+	let newCategoryName = $state('');
 	let addFeedError = $state('');
+	let searchQuery = $state('');
+	let debouncedSearch = $state('');
 	let initialized = $state(false);
 	let selectedIndex = $state(-1);
 	let cleanupKeyboard: (() => void) | undefined;
@@ -46,6 +50,7 @@
 		sort: sortOption,
 		feed: sidebarView === 'feed' && activeFeedId ? activeFeedId : undefined,
 		category: sidebarView === 'category' && activeCategoryId ? activeCategoryId : undefined,
+		search: debouncedSearch || undefined,
 	});
 
 	let featuredArticles = $derived(
@@ -126,6 +131,7 @@
 		showAddFeedModal = true;
 		feedUrl = '';
 		feedCategoryId = undefined;
+		newCategoryName = '';
 		addFeedError = '';
 		mobileMenuOpen = false;
 	}
@@ -135,7 +141,12 @@
 		addingFeed = true;
 		addFeedError = '';
 		try {
-			await feeds.add(feedUrl.trim(), feedCategoryId);
+			const body: Record<string, unknown> = { url: feedUrl.trim() };
+			if (feedCategoryId) body.category_id = feedCategoryId;
+			if (newCategoryName.trim()) body.new_category = newCategoryName.trim();
+			await api.post('/api/feeds', body);
+			await feeds.load();
+			await categories.load();
 			showAddFeedModal = false;
 			articles.load(currentFilters);
 		} catch (err) {
@@ -230,6 +241,13 @@
 		cleanupKeyboard?.();
 		clearInterval(refreshInterval);
 		clearInterval(countdownInterval);
+	});
+
+	// Debounce search input
+	$effect(() => {
+		const q = searchQuery;
+		const timer = setTimeout(() => { debouncedSearch = q; }, 300);
+		return () => clearTimeout(timer);
 	});
 
 	$effect(() => {
@@ -340,6 +358,34 @@
 					</div>
 				</div>
 
+				<!-- Search -->
+				<div class="hidden sm:flex items-center flex-1 max-w-xs mx-4">
+					<div class="relative w-full">
+						<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+						</svg>
+						<input
+							type="search"
+							bind:value={searchQuery}
+							placeholder="Search articles..."
+							class="w-full pl-10 pr-4 py-1.5 text-sm rounded-lg
+								bg-[var(--color-card)] border border-[var(--color-border)]
+								text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
+								focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
+						/>
+						{#if searchQuery}
+							<button
+								onclick={() => (searchQuery = '')}
+								class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
+							>
+								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</button>
+						{/if}
+					</div>
+				</div>
+
 				<div class="flex items-center gap-3">
 					<!-- Refresh countdown -->
 					<button
@@ -402,7 +448,7 @@
 							title="List view"
 						>
 							<svg class="w-4 h-4 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
 							</svg>
 						</button>
 					</div>
@@ -531,20 +577,33 @@
 
 			<div>
 				<label for="feed-category" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
-					Category (optional)
+					Category
 				</label>
-				<select
-					id="feed-category"
-					bind:value={feedCategoryId}
-					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]
-						text-[var(--color-text-primary)]
-						focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
-				>
-					<option value={undefined}>None</option>
-					{#each $categories as cat}
-						<option value={cat.id}>{cat.name}</option>
-					{/each}
-				</select>
+				<div class="flex gap-2">
+					<select
+						id="feed-category"
+						bind:value={feedCategoryId}
+						disabled={!!newCategoryName.trim()}
+						class="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]
+							text-[var(--color-text-primary)]
+							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all
+							disabled:opacity-50"
+					>
+						<option value={undefined}>None</option>
+						{#each $categories as cat}
+							<option value={cat.id}>{cat.name}</option>
+						{/each}
+					</select>
+					<span class="self-center text-xs text-[var(--color-text-tertiary)]">or</span>
+					<input
+						type="text"
+						bind:value={newCategoryName}
+						placeholder="New category"
+						class="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]
+							text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
+							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
+					/>
+				</div>
 			</div>
 
 			<div class="flex justify-end gap-3 pt-2">

@@ -29,7 +29,7 @@
 		setTimeout(() => (starAnimating = false), 200);
 	}
 
-	let feedIcon = $derived(getFaviconUrl(article.feed_icon_url, undefined, undefined));
+	let feedIcon = $derived(getFaviconUrl(article.feed_icon_url, article.url, undefined));
 </script>
 
 <a

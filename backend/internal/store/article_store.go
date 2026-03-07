@@ -30,6 +30,7 @@ type ArticleFilter struct {
 	Status     string
 	Sort       string
 	Tag        string
+	Search     string
 	Page       int
 	Limit      int
 }
@@ -89,6 +90,18 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		conditions = append(conditions, "EXISTS (SELECT 1 FROM article_tags at2 JOIN tags t ON at2.tag_id = t.id WHERE at2.article_id = a.id AND t.name = ?)")
 		args = append(args, filter.Tag)
 	}
+	if filter.Search != "" {
+		conditions = append(conditions, "(a.title LIKE ? OR a.content_clean LIKE ? OR a.content_raw LIKE ?)")
+		searchTerm := "%" + filter.Search + "%"
+		args = append(args, searchTerm, searchTerm, searchTerm)
+	}
+
+	// Cross-feed deduplication: keep only the article with the lowest ID for each URL
+	conditions = append(conditions, `a.id = (SELECT MIN(a2.id) FROM articles a2 JOIN feeds f2 ON a2.feed_id = f2.id WHERE a2.url = a.url AND f2.user_id = ? AND a2.url != '')`)
+	args = append(args, userID)
+
+	// Filter sponsored/ad content
+	conditions = append(conditions, `a.title NOT LIKE '%[Sponsored]%' AND a.title NOT LIKE '%[Ad]%' AND a.title NOT LIKE '%Sponsored Post%' AND a.title NOT LIKE '%Advertisement%'`)
 
 	where := strings.Join(conditions, " AND ")
 

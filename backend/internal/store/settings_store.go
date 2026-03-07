@@ -15,6 +15,9 @@ func (q *Queries) GetSettings(userID int64) (map[string]string, error) {
 		}
 		settings[key] = value
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return settings, nil
 }
 

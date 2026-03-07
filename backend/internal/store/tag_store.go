@@ -17,6 +17,9 @@ func (q *Queries) ListTags(userID int64) ([]models.Tag, error) {
 		}
 		tags = append(tags, t)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return tags, nil
 }
 
@@ -61,6 +64,9 @@ func (q *Queries) GetArticleTags(articleID int64) ([]string, error) {
 			return nil, err
 		}
 		tags = append(tags, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return tags, nil
 }

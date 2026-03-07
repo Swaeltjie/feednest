@@ -188,6 +188,9 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		a.ContentRaw = ""
 		articles = append(articles, a)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
 	return articles, total, nil
 }
 

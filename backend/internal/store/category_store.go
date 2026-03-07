@@ -10,7 +10,10 @@ func (q *Queries) CreateCategory(userID int64, name string, position int) (*mode
 	if err != nil {
 		return nil, err
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
 	return &models.Category{ID: id, UserID: userID, Name: name, Position: position}, nil
 }
 
@@ -31,6 +34,9 @@ func (q *Queries) ListCategories(userID int64) ([]models.Category, error) {
 			return nil, err
 		}
 		categories = append(categories, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return categories, nil
 }

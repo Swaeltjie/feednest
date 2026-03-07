@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { api, setAccessToken } from '$lib/api/client';
+import { api, setAccessToken, getAccessToken } from '$lib/api/client';
 
 interface User {
 	id: number;
@@ -61,7 +61,17 @@ function createAuthStore() {
 					refresh_token: refreshTok,
 				});
 				setAccessToken(data.access_token);
-				set({ user: null, isAuthenticated: true, loading: false });
+				// Decode user info from the JWT payload
+				let user: User | null = null;
+				try {
+					const payload = JSON.parse(atob(data.access_token.split('.')[1]));
+					if (payload.user_id) {
+						user = { id: payload.user_id, username: '', email: '' };
+					}
+				} catch {
+					// Token decode failed, continue with null user
+				}
+				set({ user, isAuthenticated: true, loading: false });
 			} catch {
 				set({ user: null, isAuthenticated: false, loading: false });
 			}

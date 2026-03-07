@@ -14,7 +14,10 @@ func (q *Queries) CreateFeed(userID int64, url, title, siteURL, iconURL string, 
 	if err != nil {
 		return nil, err
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
 	return &models.Feed{
 		ID:            id,
 		UserID:        userID,
@@ -48,6 +51,9 @@ func (q *Queries) ListFeeds(userID int64) ([]models.Feed, error) {
 			return nil, err
 		}
 		feeds = append(feeds, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return feeds, nil
 }
@@ -114,6 +120,9 @@ func (q *Queries) GetFeedsDueForFetch() ([]models.Feed, error) {
 			return nil, err
 		}
 		feeds = append(feeds, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return feeds, nil
 }

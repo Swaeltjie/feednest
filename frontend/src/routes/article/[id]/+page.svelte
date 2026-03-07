@@ -202,6 +202,7 @@
 								alt=""
 								class="w-4 h-4 rounded"
 								loading="lazy"
+								onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
 							/>
 						{/if}
 						<span class="font-medium text-[var(--color-text-primary)]">{article.feed_title}</span>

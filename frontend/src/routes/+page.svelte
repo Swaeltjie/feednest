@@ -457,6 +457,8 @@
 			onSelectFeed={selectFeed}
 			onSelectCategory={selectCategory}
 			onAddFeed={openAddFeed}
+			onMarkFeedRead={markFeedRead}
+			onMarkCategoryRead={markCategoryRead}
 		/>
 	</div>
 

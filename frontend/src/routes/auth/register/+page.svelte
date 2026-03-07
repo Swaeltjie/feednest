@@ -32,7 +32,7 @@
 	}
 </script>
 
-<div class="min-h-screen flex items-center justify-center auth-bg relative overflow-hidden">
+<div class="min-h-screen flex items-center justify-center auth-bg relative overflow-x-hidden overflow-y-auto py-8">
 	<!-- Animated background orbs -->
 	<div class="absolute inset-0 overflow-hidden pointer-events-none">
 		<div class="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-indigo-500/10 blur-3xl animate-float-slow"></div>

@@ -15,11 +15,11 @@
 
 No tracking. No ads. No algorithms deciding what you see.
 
-[Quick Start](#-quick-start) ·
-[Features](#-features) ·
-[Keyboard Shortcuts](#-keyboard-shortcuts) ·
-[Tech Stack](#-tech-stack) ·
-[Development](#-development)
+[Quick Start](#quick-start) ·
+[Features](#features) ·
+[Keyboard Shortcuts](#keyboard-shortcuts) ·
+[Tech Stack](#tech-stack) ·
+[Development](#development)
 
 ---
 
@@ -49,11 +49,13 @@ Open **http://localhost:3000**, create your account, and add your first feed. Th
 
 ### Reading Experience
 
-- **Feedly-style slide-in reader** — gorgeous side panel that doesn't lose your scroll position
+- **Inline reading pane** — split-pane layout keeps article list visible while you read
+- **Focus mode** — press `f` to hide the list and go full-width for distraction-free reading
 - **Three view modes** — Hybrid (hero cards + dense list), Card grid, or compact List
 - **Smart prioritization** — articles scored by your reading patterns, not engagement bait
 - **Beautiful typography** — tuned prose with proper headings, blockquote accents, and code formatting
 - **Content extraction** — pulls full articles even from summary-only feeds using readability
+- **Reading progress bar** — gradient bar tracks your scroll position through the article
 
 ### Organization
 
@@ -67,8 +69,9 @@ Open **http://localhost:3000**, create your account, and add your first feed. Th
 - **Glassmorphic design** — frosted glass toolbars, gradient accents, adaptive dark/light themes
 - **Full-text search** — instant debounced search across all article titles and content
 - **Live refresh timer** — animated countdown ring shows next auto-refresh (click to refresh now)
-- **Keyboard-first** — navigate, star, dismiss, and search without touching the mouse
-- **Staggered animations** — articles cascade in with timed delays for a premium feel
+- **Keyboard-first** — vim-style navigation, command palette (`Ctrl+K`), chord sequences (`gg`)
+- **Command palette** — fuzzy search across feeds, categories, and actions
+- **Spring animations** — physics-based motion system with staggered entrances
 - **Responsive** — works beautifully from phones to ultra-wides
 
 ### Self-Hosting Done Right
@@ -93,8 +96,17 @@ Open **http://localhost:3000**, create your account, and add your first feed. Th
 | `s` | Toggle star |
 | `m` | Toggle read/unread |
 | `d` | Dismiss |
+| `f` | Toggle focus mode |
 | `v` | Cycle view mode |
+| `1` / `2` / `3` | Hybrid / Cards / List view |
+| `g g` | Jump to first article |
+| `G` | Jump to last article |
 | `/` | Focus search |
+| `r` | Refresh feeds |
+| `Ctrl+K` | Command palette |
+| `?` | Keyboard shortcuts help |
+
+See [docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md) for the full reference.
 
 <br/>
 

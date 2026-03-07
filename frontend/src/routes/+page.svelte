@@ -49,6 +49,7 @@
 	let scrollY = $state(0);
 	let headerCompact = $derived(scrollY > 80);
 	let focusMode = $state(false);
+	let sentinelEl: HTMLElement | undefined = $state();
 
 	const FEATURED_COUNT = 3;
 
@@ -281,6 +282,9 @@
 				if (articleList.length > 0) {
 					selectedIndex = articleList.length - 1;
 					scrollSelectedIntoView();
+					if (articleList.length < $articles.total) {
+						articles.loadMore(currentFilters);
+					}
 				}
 			},
 			r: (e) => {
@@ -311,6 +315,20 @@
 		if (!initialized) return;
 		const filters = currentFilters;
 		articles.load(filters);
+	});
+
+	$effect(() => {
+		if (!sentinelEl) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && !$articles.loading && !$articles.loadingMore && $articles.articles.length < $articles.total) {
+					articles.loadMore(currentFilters);
+				}
+			},
+			{ rootMargin: '300px' }
+		);
+		observer.observe(sentinelEl);
+		return () => observer.disconnect();
 	});
 
 	let pageTitle = $derived.by(() => {
@@ -616,9 +634,15 @@
 							</div>
 						{/if}
 
-						{#if $articles.articles.length > 0}
+						{#if $articles.articles.length < $articles.total}
+							<div bind:this={sentinelEl} class="flex items-center justify-center py-6">
+								{#if $articles.loadingMore}
+									<div class="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin"></div>
+								{/if}
+							</div>
+						{:else if $articles.articles.length > 0}
 							<div class="text-center py-4 text-sm text-[var(--color-text-tertiary)]">
-								Showing {$articles.articles.length} of {$articles.total} articles
+								Showing all {$articles.total} articles
 							</div>
 						{/if}
 					{/if}

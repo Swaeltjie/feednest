@@ -158,6 +158,13 @@
 		}
 	}
 
+	function scrollSelectedIntoView() {
+		requestAnimationFrame(() => {
+			const el = document.querySelector(`[data-article-index="${selectedIndex}"]`);
+			el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		});
+	}
+
 	onMount(async () => {
 		try {
 			await Promise.all([feeds.load(), categories.load()]);
@@ -178,43 +185,45 @@
 		}, 300000);
 
 		cleanupKeyboard = setupKeyboardShortcuts({
-			j: () => {
+			j: (e) => {
 				const articleList = $articles.articles;
 				if (articleList.length > 0) {
 					selectedIndex = Math.min(selectedIndex + 1, articleList.length - 1);
+					scrollSelectedIntoView();
 				}
 			},
-			k: () => {
+			k: (e) => {
 				if (selectedIndex > 0) {
 					selectedIndex = selectedIndex - 1;
+					scrollSelectedIntoView();
 				}
 			},
-			enter: () => {
+			enter: (e) => {
 				const articleList = $articles.articles;
 				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
 					openArticle(articleList[selectedIndex].id);
 				}
 			},
-			escape: () => {
+			escape: (e) => {
 				if (openArticleId) {
 					closeArticle();
 				}
 			},
-			s: () => {
+			s: (e) => {
 				const articleList = $articles.articles;
 				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
 					const a = articleList[selectedIndex];
 					articles.toggleStar(a.id, !a.is_starred);
 				}
 			},
-			m: () => {
+			m: (e) => {
 				const articleList = $articles.articles;
 				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
 					const a = articleList[selectedIndex];
 					articles.toggleRead(a.id, !a.is_read);
 				}
 			},
-			d: () => {
+			d: (e) => {
 				const articleList = $articles.articles;
 				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
 					articles.dismiss(articleList[selectedIndex].id);
@@ -223,12 +232,12 @@
 					}
 				}
 			},
-			v: () => {
+			v: (e) => {
 				const modes: ViewMode[] = ['hybrid', 'cards', 'list'];
 				const current = modes.indexOf(viewMode);
 				setViewMode(modes[(current + 1) % modes.length]);
 			},
-			'/': () => {
+			'/': (e) => {
 				const searchInput = document.querySelector<HTMLInputElement>(
 					'input[type="search"], input[placeholder*="earch"]'
 				);
@@ -236,6 +245,31 @@
 					searchInput.focus();
 				}
 			},
+			'cmd+k': (e) => {
+				// Will be wired to command palette in Task 6
+			},
+			'?': (e) => {
+				// Will be wired to keyboard hints in Task 7
+			},
+			gg: (e) => {
+				selectedIndex = 0;
+				scrollSelectedIntoView();
+			},
+			'G': (e) => {
+				const articleList = $articles.articles;
+				if (articleList.length > 0) {
+					selectedIndex = articleList.length - 1;
+					scrollSelectedIntoView();
+				}
+			},
+			r: (e) => {
+				refreshCountdown = 300;
+				feeds.load();
+				articles.load(currentFilters);
+			},
+			'1': (e) => setViewMode('hybrid'),
+			'2': (e) => setViewMode('cards'),
+			'3': (e) => setViewMode('list'),
 		});
 	});
 
@@ -502,13 +536,17 @@
 					{#if featuredArticles.length > 0}
 						<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
 							{#each featuredArticles as article, i (article.id)}
-								<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
+								<div data-article-index={$articles.articles.indexOf(article)}>
+									<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
+								</div>
 							{/each}
 						</div>
 					{/if}
 					<div style="background: var(--color-card);" class="rounded-t-2xl mx-2 mt-2">
 						{#each listArticles as article, i (article.id)}
-							<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
+							<div data-article-index={$articles.articles.indexOf(article)}>
+								<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
+							</div>
 						{/each}
 					</div>
 
@@ -516,7 +554,9 @@
 				{:else if viewMode === 'cards'}
 					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
 						{#each $articles.articles as article, i (article.id)}
-							<ArticleCard {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
+							<div data-article-index={i}>
+								<ArticleCard {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
+							</div>
 						{/each}
 					</div>
 
@@ -524,7 +564,9 @@
 				{:else}
 					<div style="background: var(--color-card);" class="m-2 rounded-2xl overflow-hidden">
 						{#each $articles.articles as article, i (article.id)}
-							<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
+							<div data-article-index={i}>
+								<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
+							</div>
 						{/each}
 					</div>
 				{/if}

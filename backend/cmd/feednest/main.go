@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/feednest/backend/internal/api"
+	"github.com/feednest/backend/internal/store"
 )
 
 func main() {
@@ -14,7 +15,25 @@ func main() {
 		port = "8080"
 	}
 
-	router := api.NewRouter()
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "./feednest.db"
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "change-me-in-production"
+		log.Println("WARNING: using default JWT secret. Set JWT_SECRET env var in production.")
+	}
+
+	db, err := store.NewDB(dbPath)
+	if err != nil {
+		log.Fatalf("failed to initialize database: %v", err)
+	}
+	defer db.Close()
+
+	queries := store.New(db)
+	router := api.NewRouter(queries, jwtSecret)
 
 	log.Printf("FeedNest backend starting on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))

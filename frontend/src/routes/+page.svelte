@@ -679,31 +679,29 @@
 				<label for="feed-category" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
 					Category
 				</label>
-				<div class="flex gap-2">
-					<select
-						id="feed-category"
-						bind:value={feedCategoryId}
-						disabled={!!newCategoryName.trim()}
-						class="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-hover)]
-							text-[var(--color-text-primary)]
-							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all
-							disabled:opacity-50 appearance-none cursor-pointer"
-					>
-						<option value={undefined}>None</option>
-						{#each $categories as cat}
-							<option value={cat.id}>{cat.name}</option>
-						{/each}
-					</select>
-					<span class="self-center text-xs text-[var(--color-text-tertiary)]">or</span>
-					<input
-						type="text"
-						bind:value={newCategoryName}
-						placeholder="New category"
-						class="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-hover)]
-							text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
-							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
-					/>
-				</div>
+				<select
+					id="feed-category"
+					bind:value={feedCategoryId}
+					disabled={!!newCategoryName.trim()}
+					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-hover)]
+						text-[var(--color-text-primary)]
+						focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all
+						disabled:opacity-50 appearance-none cursor-pointer"
+				>
+					<option value={undefined}>None</option>
+					{#each $categories as cat}
+						<option value={cat.id}>{cat.name}</option>
+					{/each}
+				</select>
+				<div class="text-center text-xs text-[var(--color-text-tertiary)] my-2">or create new</div>
+				<input
+					type="text"
+					bind:value={newCategoryName}
+					placeholder="New category name"
+					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-hover)]
+						text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
+						focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
+				/>
 			</div>
 
 			<div class="flex justify-end gap-3 pt-2">

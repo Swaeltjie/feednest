@@ -117,6 +117,21 @@
 		mobileMenuOpen = false;
 	}
 
+	function selectUnread() {
+		sidebarView = 'all';
+		activeFeedId = null;
+		activeCategoryId = null;
+		filterTab = 'unread';
+		mobileMenuOpen = false;
+	}
+
+	async function markAllRead() {
+		const unreadIds = $articles.articles.filter(a => !a.is_read).map(a => a.id);
+		if (unreadIds.length === 0) return;
+		await api.post('/api/articles/bulk', { action: 'mark_read', article_ids: unreadIds });
+		await articles.load(currentFilters);
+	}
+
 	function selectFeed(id: number) {
 		sidebarView = 'feed';
 		activeFeedId = id;
@@ -638,7 +653,20 @@
 	onSelectCategory={selectCategory}
 	onSelectAll={selectAll}
 	onSelectStarred={selectStarred}
+	onSelectUnread={selectUnread}
 	onRefresh={async () => { refreshCountdown = 300; await feeds.load(); await articles.load(currentFilters); }}
+	onSetViewMode={(mode) => setViewMode(mode as 'hybrid' | 'cards' | 'list')}
+	onSetSort={(sort) => { sortOption = sort as 'smart' | 'newest' | 'oldest'; }}
+	onAddFeed={openAddFeed}
+	onOpenArticle={openArticle}
+	onShowShortcuts={() => { keyboardHintsOpen = true; }}
+	onMarkAllRead={markAllRead}
+	onOpenExternal={() => {
+		if (openArticleId) {
+			const a = $articles.articles.find(a => a.id === openArticleId);
+			if (a?.url) window.open(a.url, '_blank', 'noopener');
+		}
+	}}
 />
 
 <!-- Keyboard Hints -->

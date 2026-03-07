@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { feeds, categories } from '$lib/stores/feeds';
+	import { articles } from '$lib/stores/articles';
 	import { settings } from '$lib/stores/settings';
+	import { api, getAccessToken } from '$lib/api/client';
 
 	interface CommandItem {
 		id: string;
 		label: string;
-		category: 'navigate' | 'action';
+		category: 'navigate' | 'action' | 'article' | 'view';
 		icon: string;
 		shortcut?: string;
 		action: () => void;
@@ -17,14 +19,30 @@
 		onSelectCategory,
 		onSelectAll,
 		onSelectStarred,
-		onRefresh
+		onSelectUnread,
+		onRefresh,
+		onSetViewMode,
+		onSetSort,
+		onAddFeed,
+		onOpenArticle,
+		onShowShortcuts,
+		onMarkAllRead,
+		onOpenExternal,
 	}: {
 		open: boolean;
 		onSelectFeed?: (id: number) => void;
 		onSelectCategory?: (id: number) => void;
 		onSelectAll?: () => void;
 		onSelectStarred?: () => void;
+		onSelectUnread?: () => void;
 		onRefresh?: () => void;
+		onSetViewMode?: (mode: string) => void;
+		onSetSort?: (sort: string) => void;
+		onAddFeed?: () => void;
+		onOpenArticle?: (id: number) => void;
+		onShowShortcuts?: () => void;
+		onMarkAllRead?: () => void;
+		onOpenExternal?: () => void;
 	} = $props();
 
 	let query = $state('');
@@ -34,20 +52,28 @@
 	let commands = $derived.by(() => {
 		const items: CommandItem[] = [];
 
+		// ── Navigation ──
 		items.push({
 			id: 'nav-all',
 			label: 'All Articles',
 			category: 'navigate',
-			icon: '\u{1F4F0}',
+			icon: '📰',
 			action: () => { onSelectAll?.(); close(); }
+		});
+
+		items.push({
+			id: 'nav-unread',
+			label: 'Unread Articles',
+			category: 'navigate',
+			icon: '🔵',
+			action: () => { onSelectUnread?.(); close(); }
 		});
 
 		items.push({
 			id: 'nav-starred',
 			label: 'Starred Articles',
 			category: 'navigate',
-			icon: '\u2B50',
-			shortcut: '',
+			icon: '⭐',
 			action: () => { onSelectStarred?.(); close(); }
 		});
 
@@ -56,7 +82,7 @@
 				id: `nav-cat-${cat.id}`,
 				label: `Category: ${cat.name}`,
 				category: 'navigate',
-				icon: '\u{1F4C1}',
+				icon: '📁',
 				action: () => { onSelectCategory?.(cat.id); close(); }
 			});
 		}
@@ -66,25 +92,95 @@
 				id: `nav-feed-${feed.id}`,
 				label: feed.title,
 				category: 'navigate',
-				icon: '\u{1F517}',
+				icon: '🔗',
 				action: () => { onSelectFeed?.(feed.id); close(); }
 			});
 		}
 
+		// ── View switching ──
+		items.push({
+			id: 'view-hybrid',
+			label: 'Hybrid (Magazine) View',
+			category: 'view',
+			icon: '📐',
+			shortcut: '1',
+			action: () => { onSetViewMode?.('hybrid'); close(); }
+		});
+
+		items.push({
+			id: 'view-cards',
+			label: 'Card Grid View',
+			category: 'view',
+			icon: '🃏',
+			shortcut: '2',
+			action: () => { onSetViewMode?.('cards'); close(); }
+		});
+
+		items.push({
+			id: 'view-list',
+			label: 'Compact List View',
+			category: 'view',
+			icon: '📋',
+			shortcut: '3',
+			action: () => { onSetViewMode?.('list'); close(); }
+		});
+
+		// ── Sort switching ──
+		items.push({
+			id: 'sort-smart',
+			label: 'Sort: Smart',
+			category: 'view',
+			icon: '🧠',
+			action: () => { onSetSort?.('smart'); close(); }
+		});
+
+		items.push({
+			id: 'sort-newest',
+			label: 'Sort: Newest First',
+			category: 'view',
+			icon: '🕐',
+			action: () => { onSetSort?.('newest'); close(); }
+		});
+
+		items.push({
+			id: 'sort-oldest',
+			label: 'Sort: Oldest First',
+			category: 'view',
+			icon: '🕰️',
+			action: () => { onSetSort?.('oldest'); close(); }
+		});
+
+		// ── Actions ──
 		items.push({
 			id: 'action-refresh',
 			label: 'Refresh Feeds',
 			category: 'action',
-			icon: '\u{1F504}',
+			icon: '🔄',
 			shortcut: 'r',
 			action: () => { onRefresh?.(); close(); }
+		});
+
+		items.push({
+			id: 'action-mark-all-read',
+			label: 'Mark All as Read',
+			category: 'action',
+			icon: '✅',
+			action: () => { onMarkAllRead?.(); close(); }
+		});
+
+		items.push({
+			id: 'action-add-feed',
+			label: 'Add Feed',
+			category: 'action',
+			icon: '➕',
+			action: () => { onAddFeed?.(); close(); }
 		});
 
 		items.push({
 			id: 'action-theme',
 			label: 'Toggle Dark Mode',
 			category: 'action',
-			icon: '\u{1F3A8}',
+			icon: '🎨',
 			action: () => {
 				const current = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
 				settings.setTheme(current);
@@ -92,9 +188,60 @@
 			}
 		});
 
+		items.push({
+			id: 'action-shortcuts',
+			label: 'Keyboard Shortcuts',
+			category: 'action',
+			icon: '⌨️',
+			shortcut: '?',
+			action: () => { onShowShortcuts?.(); close(); }
+		});
+
+		items.push({
+			id: 'action-open-external',
+			label: 'Open Article in Browser',
+			category: 'action',
+			icon: '🌐',
+			action: () => { onOpenExternal?.(); close(); }
+		});
+
+		items.push({
+			id: 'action-opml-import',
+			label: 'Import OPML',
+			category: 'action',
+			icon: '📥',
+			action: () => { triggerOpmlImport(); close(); }
+		});
+
+		items.push({
+			id: 'action-opml-export',
+			label: 'Export OPML',
+			category: 'action',
+			icon: '📤',
+			action: () => { triggerOpmlExport(); close(); }
+		});
+
+		// ── Article search (only when query is typed) ──
+		if (query.trim().length >= 2) {
+			const q = query.toLowerCase();
+			for (const article of $articles.articles) {
+				if (article.title.toLowerCase().includes(q)) {
+					items.push({
+						id: `article-${article.id}`,
+						label: article.title,
+						category: 'article',
+						icon: '📄',
+						action: () => { onOpenArticle?.(article.id); close(); }
+					});
+				}
+			}
+		}
+
 		if (!query.trim()) return items;
 		const q = query.toLowerCase();
-		return items.filter((item) => item.label.toLowerCase().includes(q));
+		return items.filter((item) =>
+			item.label.toLowerCase().includes(q) || item.category.toLowerCase().includes(q)
+		);
 	});
 
 	$effect(() => {
@@ -124,14 +271,74 @@
 		} else if (e.key === 'ArrowDown') {
 			e.preventDefault();
 			selectedIdx = (selectedIdx + 1) % Math.max(1, commands.length);
+			scrollSelectedIntoView();
 		} else if (e.key === 'ArrowUp') {
 			e.preventDefault();
 			selectedIdx = (selectedIdx - 1 + commands.length) % Math.max(1, commands.length);
+			scrollSelectedIntoView();
 		} else if (e.key === 'Enter') {
 			e.preventDefault();
 			commands[selectedIdx]?.action();
 		}
 	}
+
+	function scrollSelectedIntoView() {
+		requestAnimationFrame(() => {
+			const el = document.querySelector(`[data-cmd-index="${selectedIdx}"]`);
+			el?.scrollIntoView({ block: 'nearest' });
+		});
+	}
+
+	const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8082';
+
+	function triggerOpmlImport() {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.opml,.xml';
+		input.onchange = async () => {
+			const file = input.files?.[0];
+			if (!file) return;
+			const formData = new FormData();
+			formData.append('file', file);
+			try {
+				const token = getAccessToken();
+				await fetch(`${API_BASE}/api/opml/import`, {
+					method: 'POST',
+					headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+					body: formData,
+				});
+				onRefresh?.();
+			} catch (err) {
+				console.error('OPML import failed:', err);
+			}
+		};
+		input.click();
+	}
+
+	async function triggerOpmlExport() {
+		try {
+			const token = getAccessToken();
+			const res = await fetch(`${API_BASE}/api/opml/export`, {
+				headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+			});
+			const blob = await res.blob();
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'feednest-feeds.opml';
+			a.click();
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			console.error('OPML export failed:', err);
+		}
+	}
+
+	const categoryLabels: Record<string, string> = {
+		navigate: 'Navigation',
+		view: 'View',
+		action: 'Action',
+		article: 'Article',
+	};
 </script>
 
 {#if open}
@@ -158,7 +365,7 @@
 					bind:this={inputEl}
 					bind:value={query}
 					type="text"
-					placeholder="Type a command or search..."
+					placeholder="Type a command or search articles..."
 					class="flex-1 bg-transparent text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)] outline-none text-base"
 				/>
 				<kbd class="px-2 py-0.5 text-xs rounded bg-[var(--color-surface)] text-[var(--color-text-tertiary)] border border-[var(--color-border)]">Esc</kbd>
@@ -171,20 +378,25 @@
 					</div>
 				{:else}
 					{#each commands as item, i}
+						{#if i === 0 || commands[i - 1].category !== item.category}
+							<div class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">
+								{categoryLabels[item.category] || item.category}
+							</div>
+						{/if}
 						<button
-							class="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors
+							data-cmd-index={i}
+							class="w-full flex items-center gap-3 px-4 py-2 text-left transition-colors
 								{i === selectedIdx
 									? 'bg-[var(--color-accent-glow)] text-[var(--color-accent)]'
 									: 'text-[var(--color-text-primary)] hover:bg-[var(--color-elevated)]'}"
 							onclick={() => item.action()}
 							onmouseenter={() => (selectedIdx = i)}
 						>
-							<span class="text-lg">{item.icon}</span>
-							<span class="flex-1 text-sm font-medium">{item.label}</span>
+							<span class="text-base w-6 text-center">{item.icon}</span>
+							<span class="flex-1 text-sm font-medium truncate">{item.label}</span>
 							{#if item.shortcut}
 								<kbd class="px-1.5 py-0.5 text-xs rounded bg-[var(--color-surface)] text-[var(--color-text-tertiary)] border border-[var(--color-border)]">{item.shortcut}</kbd>
 							{/if}
-							<span class="text-xs text-[var(--color-text-tertiary)] capitalize">{item.category}</span>
 						</button>
 					{/each}
 				{/if}

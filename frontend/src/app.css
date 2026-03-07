@@ -283,6 +283,50 @@ html.theme-transitioning *::after {
 	animation: slideFromLeft var(--duration-smooth) var(--spring-smooth);
 }
 
+/* ─── View Transitions API ─── */
+::view-transition-old(*),
+::view-transition-new(*) {
+	animation-duration: var(--duration-smooth);
+	animation-timing-function: var(--spring-smooth);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation: none;
+}
+
+/* ─── Floating animation for empty states ─── */
+@keyframes gentleFloat {
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+	animation: gentleFloat 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.animate-float {
+		animation: none;
+	}
+}
+
+/* ─── Spring entrance animation ─── */
+@keyframes springIn {
+	0% {
+		opacity: 0;
+		transform: translateY(16px) scale(0.98);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+.spring-in {
+	animation: springIn var(--duration-smooth) var(--spring-dramatic) both;
+}
+
 /* ─── Accent text selection ─── */
 ::selection {
   background: var(--color-accent-glow);

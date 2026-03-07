@@ -5,13 +5,23 @@
 	import { getFaviconUrl } from '$lib/utils/favicon';
 	import { getFeedColor } from '$lib/utils/color';
 	import { starBurst } from '$lib/utils/particles';
+	import { swipeable } from '$lib/utils/swipe';
 
 	let {
 		article,
 		selected = false,
 		index = 0,
 		onOpen = (_id: number) => {},
-	}: { article: Article; selected?: boolean; index?: number; onOpen?: (id: number) => void } = $props();
+		onToggleRead,
+		onToggleStar,
+	}: {
+		article: Article;
+		selected?: boolean;
+		index?: number;
+		onOpen?: (id: number) => void;
+		onToggleRead?: (id: number, isRead: boolean) => void;
+		onToggleStar?: (id: number, isStarred: boolean) => void;
+	} = $props();
 
 	let starAnimating = $state(false);
 
@@ -44,12 +54,17 @@
 <a
 	href="/article/{article.id}"
 	onclick={handleClick}
+	use:swipeable={{
+		onSwipeRight: () => onToggleRead?.(article.id, !article.is_read),
+		onSwipeLeft: () => onToggleStar?.(article.id, !article.is_starred),
+		threshold: 80
+	}}
 	class="group flex items-start gap-4 px-4 py-3.5 transition-all duration-200 fade-in-up
 		border-b border-[var(--color-border)]
 		hover:bg-[var(--color-elevated)] hover:shadow-md
 		{article.is_read ? 'opacity-60 hover:opacity-90' : ''}
 		{selected ? 'bg-[var(--color-accent-glow)] ring-1 ring-inset ring-[var(--color-accent)]/30' : ''}"
-	style="animation-delay: {index * 30}ms; border-left: 3px solid {feedAccentColor || 'transparent'};"
+	style="view-transition-name: article-{article.id}; animation-delay: {index * 30}ms; border-left: 3px solid {feedAccentColor || 'transparent'};"
 >
 	<!-- Thumbnail -->
 	{#if article.thumbnail_url}

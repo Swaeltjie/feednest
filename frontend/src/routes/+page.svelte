@@ -87,18 +87,32 @@
 	}
 
 	function openArticle(id: number) {
-		openArticleId = id;
-		// Mark as read immediately in the list
-		const a = $articles.articles.find((a) => a.id === id);
-		if (a && !a.is_read) {
-			articles.toggleRead(id, true);
+		const doOpen = () => {
+			openArticleId = id;
+			const a = $articles.articles.find((a) => a.id === id);
+			if (a && !a.is_read) {
+				articles.toggleRead(id, true);
+			}
+		};
+
+		if ((document as any).startViewTransition) {
+			(document as any).startViewTransition(doOpen);
+		} else {
+			doOpen();
 		}
 	}
 
 	function closeArticle() {
-		openArticleId = null;
-		// Reload to refresh read states
-		articles.load(currentFilters);
+		const doClose = () => {
+			openArticleId = null;
+			articles.load(currentFilters);
+		};
+
+		if ((document as any).startViewTransition) {
+			(document as any).startViewTransition(doClose);
+		} else {
+			doClose();
+		}
 	}
 
 	function selectAll() {

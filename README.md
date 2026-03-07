@@ -117,7 +117,7 @@ Open **http://localhost:3000**, create your account, and add your first feed. Th
 
 ### Prerequisites
 
-- **Go 1.22+** and **Node 20+** for local dev
+- **Go 1.26+** and **Node 24+** for local dev
 - **Docker** for containerized deployment
 
 ### Local Development

@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, derived } from 'svelte/store';
 import { api } from '$lib/api/client';
 
 export interface Article {
@@ -44,9 +44,22 @@ function createArticlesStore() {
 		articles: Article[];
 		total: number;
 		loading: boolean;
-	}>({ articles: [], total: 0, loading: false });
+		loadingMore: boolean;
+	}>({ articles: [], total: 0, loading: false, loadingMore: false });
 
 	let loadId = 0;
+	const PAGE_SIZE = 30;
+
+	function buildParams(filters: ArticleFilters): URLSearchParams {
+		const params = new URLSearchParams();
+		if (filters.status) params.set('status', filters.status);
+		params.set('sort', filters.sort || 'smart');
+		if (filters.feed) params.set('feed', String(filters.feed));
+		if (filters.category) params.set('category', String(filters.category));
+		if (filters.tag) params.set('tag', filters.tag);
+		if (filters.search) params.set('search', filters.search);
+		return params;
+	}
 
 	return {
 		subscribe,
@@ -54,22 +67,53 @@ function createArticlesStore() {
 		async load(filters: ArticleFilters = {}) {
 			const thisLoad = ++loadId;
 			update((s) => ({ ...s, loading: true }));
-			const params = new URLSearchParams();
-			if (filters.status) params.set('status', filters.status);
-			params.set('sort', filters.sort || 'smart');
-			if (filters.feed) params.set('feed', String(filters.feed));
-			if (filters.category) params.set('category', String(filters.category));
-			if (filters.tag) params.set('tag', filters.tag);
-			if (filters.search) params.set('search', filters.search);
+			const params = buildParams(filters);
 			if (filters.page) params.set('page', String(filters.page));
 
 			try {
 				const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);
 				if (thisLoad !== loadId) return;
-				set({ articles: data.articles || [], total: data.total, loading: false });
+				set({ articles: data.articles || [], total: data.total, loading: false, loadingMore: false });
 			} catch {
 				if (thisLoad !== loadId) return;
 				update((s) => ({ ...s, loading: false }));
+			}
+		},
+
+		async loadMore(filters: ArticleFilters = {}) {
+			let currentLength = 0;
+			let currentTotal = 0;
+			update((s) => {
+				currentLength = s.articles.length;
+				currentTotal = s.total;
+				return s;
+			});
+
+			if (currentLength >= currentTotal) return;
+
+			const thisLoad = ++loadId;
+			update((s) => ({ ...s, loadingMore: true }));
+
+			const nextPage = Math.floor(currentLength / PAGE_SIZE) + 1;
+			const params = buildParams(filters);
+			params.set('page', String(nextPage));
+
+			try {
+				const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);
+				if (thisLoad !== loadId) return;
+				update((s) => {
+					const existing = new Set(s.articles.map((a) => a.id));
+					const newArticles = (data.articles || []).filter((a) => !existing.has(a.id));
+					return {
+						...s,
+						articles: [...s.articles, ...newArticles],
+						total: data.total,
+						loadingMore: false,
+					};
+				});
+			} catch {
+				if (thisLoad !== loadId) return;
+				update((s) => ({ ...s, loadingMore: false }));
 			}
 		},
 
@@ -105,3 +149,4 @@ function createArticlesStore() {
 }
 
 export const articles = createArticlesStore();
+export const hasMore = derived(articles, ($articles) => $articles.total > $articles.articles.length);

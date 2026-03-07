@@ -84,6 +84,9 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		r.Put("/api/feeds/{id}", feedsH.Update)
 		r.Delete("/api/feeds/{id}", feedsH.Delete)
 
+		discoverH := handlers.NewDiscoverHandler()
+		r.Post("/api/feeds/discover", discoverH.Discover)
+
 		articlesH := handlers.NewArticleHandler(queries)
 		r.Get("/api/articles", articlesH.List)
 		r.Post("/api/articles/bulk", articlesH.Bulk)

@@ -118,6 +118,9 @@ func generateOPML(feeds []opmlFeed) (string, error) {
 func (h *OPMLHandler) Import(w http.ResponseWriter, r *http.Request) {
 	userID := apiutil.ExtractUserID(r)
 
+	// Limit upload size to 5MB
+	r.Body = http.MaxBytesReader(w, r.Body, 5*1024*1024)
+
 	file, _, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, `{"error":"file upload required"}`, http.StatusBadRequest)

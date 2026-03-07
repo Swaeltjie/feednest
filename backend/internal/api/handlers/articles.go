@@ -36,10 +36,14 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if p := r.URL.Query().Get("page"); p != "" {
-		filter.Page, _ = strconv.Atoi(p)
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			filter.Page = v
+		}
 	}
 	if l := r.URL.Query().Get("limit"); l != "" {
-		filter.Limit, _ = strconv.Atoi(l)
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 100 {
+			filter.Limit = v
+		}
 	}
 	if feedID := r.URL.Query().Get("feed"); feedID != "" {
 		id, _ := strconv.ParseInt(feedID, 10, 64)

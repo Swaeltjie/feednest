@@ -5,6 +5,7 @@
 	import { timeAgo } from '$lib/utils/time';
 	import { api } from '$lib/api/client';
 	import { onMount } from 'svelte';
+	import DOMPurify from 'isomorphic-dompurify';
 
 	let article: Article | null = $state(null);
 	let loading = $state(true);
@@ -253,7 +254,7 @@
 						max-w-none"
 					style="line-height: 1.75; font-size: 18px;"
 				>
-					{@html article.content_clean || article.content_raw}
+					{@html DOMPurify.sanitize(article.content_clean || article.content_raw)}
 				</div>
 			{:else}
 				<div

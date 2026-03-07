@@ -42,6 +42,12 @@ func (h *TagHandler) AddToArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify the article belongs to this user
+	if _, err := h.store.GetArticle(articleID, userID); err != nil {
+		http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		return
+	}
+
 	var req models.AddTagRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
 		http.Error(w, `{"error":"name is required"}`, http.StatusBadRequest)
@@ -62,6 +68,12 @@ func (h *TagHandler) RemoveFromArticle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
 		return
 	}
+	// Verify the article belongs to this user
+	if _, err := h.store.GetArticle(articleID, userID); err != nil {
+		http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		return
+	}
+
 	tagName := chi.URLParam(r, "tag")
 
 	if err := h.store.RemoveTagFromArticle(articleID, tagName, userID); err != nil {

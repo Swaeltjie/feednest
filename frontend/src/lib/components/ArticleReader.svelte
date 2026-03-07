@@ -4,6 +4,7 @@
 	import { getFaviconUrl } from '$lib/utils/favicon';
 	import { api } from '$lib/api/client';
 	import { onMount } from 'svelte';
+	import DOMPurify from 'isomorphic-dompurify';
 
 	let {
 		articleId,
@@ -239,7 +240,7 @@
 							max-w-none"
 						style="line-height: 1.75; font-size: 17px;"
 					>
-						{@html article.content_clean || article.content_raw}
+						{@html DOMPurify.sanitize(article.content_clean || article.content_raw)}
 					</div>
 				{:else}
 					<div class="flex flex-col items-center justify-center py-16 text-center">

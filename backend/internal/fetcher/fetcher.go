@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/feednest/backend/internal/urlutil"
 	"github.com/mmcdole/gofeed"
 )
 
@@ -34,6 +35,10 @@ type FeedItem struct {
 const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 func FetchFeed(feedURL string) (*FeedResult, error) {
+	if err := urlutil.IsSafeURL(feedURL); err != nil {
+		return nil, fmt.Errorf("unsafe feed URL %s: %w", feedURL, err)
+	}
+
 	req, err := http.NewRequest("GET", feedURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request for %s: %w", feedURL, err)

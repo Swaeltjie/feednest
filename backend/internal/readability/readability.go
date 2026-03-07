@@ -8,12 +8,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/feednest/backend/internal/urlutil"
 	goreadability "github.com/go-shiori/go-readability"
 )
 
 const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 func ExtractContent(articleURL string) (string, error) {
+	if err := urlutil.IsSafeURL(articleURL); err != nil {
+		return "", fmt.Errorf("unsafe article URL %s: %w", articleURL, err)
+	}
+
 	parsedURL, err := url.Parse(articleURL)
 	if err != nil {
 		return "", fmt.Errorf("invalid URL %s: %w", articleURL, err)

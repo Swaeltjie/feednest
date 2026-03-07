@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -49,7 +50,12 @@ func (h *TagHandler) AddToArticle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req models.AddTagRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Name == "" {
 		http.Error(w, `{"error":"name is required"}`, http.StatusBadRequest)
 		return
 	}
@@ -78,7 +84,11 @@ func (h *TagHandler) RemoveFromArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tagName := chi.URLParam(r, "tag")
+	tagName := strings.TrimSpace(chi.URLParam(r, "tag"))
+	if tagName == "" {
+		http.Error(w, `{"error":"tag name is required"}`, http.StatusBadRequest)
+		return
+	}
 
 	if err := h.store.RemoveTagFromArticle(articleID, tagName, userID); err != nil {
 		http.Error(w, `{"error":"failed to remove tag"}`, http.StatusInternalServerError)

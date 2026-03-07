@@ -40,7 +40,8 @@ func (rl *rateLimiter) cleanup() {
 		rl.mu.Lock()
 		now := time.Now()
 		for ip, times := range rl.attempts {
-			valid := times[:0]
+			// Use a fresh slice to allow the old underlying array to be GC'd
+			var valid []time.Time
 			for _, t := range times {
 				if now.Sub(t) < rl.window {
 					valid = append(valid, t)
@@ -61,7 +62,7 @@ func (rl *rateLimiter) allow(ip string) bool {
 	defer rl.mu.Unlock()
 
 	now := time.Now()
-	valid := rl.attempts[ip][:0]
+	var valid []time.Time
 	for _, t := range rl.attempts[ip] {
 		if now.Sub(t) < rl.window {
 			valid = append(valid, t)

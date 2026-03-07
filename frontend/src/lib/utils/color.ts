@@ -1,4 +1,14 @@
+const MAX_CACHE_SIZE = 500;
 const colorCache = new Map<string, string>();
+
+function cacheSet(key: string, value: string) {
+	// Simple LRU: delete oldest entries when cache exceeds max size
+	if (colorCache.size >= MAX_CACHE_SIZE) {
+		const firstKey = colorCache.keys().next().value;
+		if (firstKey !== undefined) colorCache.delete(firstKey);
+	}
+	colorCache.set(key, value);
+}
 
 export function hashToColor(str: string): string {
 	let hash = 0;
@@ -43,7 +53,7 @@ export function extractDominantColor(imageUrl: string): Promise<string> {
 				if (count === 0) { resolve(hashToColor(imageUrl)); return; }
 
 				const color = `rgb(${Math.round(r / count)}, ${Math.round(g / count)}, ${Math.round(b / count)})`;
-				colorCache.set(imageUrl, color);
+				cacheSet(imageUrl, color);
 				resolve(color);
 			} catch {
 				resolve(hashToColor(imageUrl));

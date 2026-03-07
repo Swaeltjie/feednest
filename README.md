@@ -24,6 +24,17 @@ No tracking. No ads. No algorithms deciding what you see.
 
 ---
 
+<br/>
+
+<img src="assets/screenshot-reader-light.png" alt="Reading pane with split view" width="100%"/>
+
+<br/>
+
+<p align="center">
+<img src="assets/screenshot-hybrid-light.png" alt="Hybrid view — light theme" width="49%"/>
+<img src="assets/screenshot-hybrid-dark.png" alt="Hybrid view — dark theme" width="49%"/>
+</p>
+
 </div>
 
 ## Why FeedNest?

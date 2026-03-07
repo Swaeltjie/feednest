@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -12,6 +13,8 @@ import (
 	"github.com/feednest/backend/internal/urlutil"
 	"github.com/mmcdole/gofeed"
 )
+
+const maxFeedResponseSize = 10 * 1024 * 1024 // 10MB
 
 type FeedResult struct {
 	Title   string
@@ -46,7 +49,7 @@ func FetchFeed(feedURL string) (*FeedResult, error) {
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/rss+xml, application/atom+xml, application/xml, text/xml, */*")
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := urlutil.SafeHTTPClient(30 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch %s: %w", feedURL, err)
@@ -57,8 +60,9 @@ func FetchFeed(feedURL string) (*FeedResult, error) {
 		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, feedURL)
 	}
 
+	limitedBody := io.LimitReader(resp.Body, maxFeedResponseSize)
 	fp := gofeed.NewParser()
-	feed, err := fp.Parse(resp.Body)
+	feed, err := fp.Parse(limitedBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse feed %s: %w", feedURL, err)
 	}

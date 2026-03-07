@@ -298,18 +298,28 @@
 		input.onchange = async () => {
 			const file = input.files?.[0];
 			if (!file) return;
+			if (file.size > 5 * 1024 * 1024) {
+				alert('OPML file too large (max 5MB)');
+				return;
+			}
 			const formData = new FormData();
 			formData.append('file', file);
 			try {
 				const token = getAccessToken();
-				await fetch(`${API_BASE}/api/opml/import`, {
+				const res = await fetch(`${API_BASE}/api/opml/import`, {
 					method: 'POST',
 					headers: token ? { 'Authorization': `Bearer ${token}` } : {},
 					body: formData,
 				});
+				if (!res.ok) {
+					const data = await res.json().catch(() => ({ error: 'Import failed' }));
+					alert(data.error || 'OPML import failed');
+					return;
+				}
 				onRefresh?.();
 			} catch (err) {
 				console.error('OPML import failed:', err);
+				alert('OPML import failed');
 			}
 		};
 		input.click();
@@ -321,15 +331,20 @@
 			const res = await fetch(`${API_BASE}/api/opml/export`, {
 				headers: token ? { 'Authorization': `Bearer ${token}` } : {},
 			});
+			if (!res.ok) {
+				alert('OPML export failed');
+				return;
+			}
 			const blob = await res.blob();
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
 			a.download = 'feednest-feeds.opml';
 			a.click();
-			URL.revokeObjectURL(url);
+			setTimeout(() => URL.revokeObjectURL(url), 10000);
 		} catch (err) {
 			console.error('OPML export failed:', err);
+			alert('OPML export failed');
 		}
 	}
 

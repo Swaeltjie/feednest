@@ -85,6 +85,24 @@ func (h *FeedHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.FetchInterval != nil {
+		if *req.FetchInterval < 60 {
+			http.Error(w, `{"error":"fetch_interval must be at least 60 seconds"}`, http.StatusBadRequest)
+			return
+		}
+		if *req.FetchInterval > 86400 {
+			http.Error(w, `{"error":"fetch_interval must not exceed 86400 seconds"}`, http.StatusBadRequest)
+			return
+		}
+	}
+
+	if req.CategoryID != nil {
+		if _, err := h.store.GetCategory(*req.CategoryID, userID); err != nil {
+			http.Error(w, `{"error":"category not found"}`, http.StatusBadRequest)
+			return
+		}
+	}
+
 	if err := h.store.UpdateFeed(id, userID, &req); err != nil {
 		http.Error(w, `{"error":"failed to update feed"}`, http.StatusInternalServerError)
 		return

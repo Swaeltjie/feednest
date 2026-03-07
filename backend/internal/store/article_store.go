@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/feednest/backend/internal/models"
 )
@@ -18,12 +19,14 @@ func makeSnippet(html string, maxLen int) string {
 	if isSnippetBlocked(text) {
 		return ""
 	}
-	if len(text) > maxLen {
-		text = text[:maxLen]
-		if i := strings.LastIndex(text, " "); i > maxLen-40 {
-			text = text[:i]
+	runes := []rune(text)
+	if utf8.RuneCountInString(text) > maxLen {
+		runes = runes[:maxLen]
+		truncated := string(runes)
+		if i := strings.LastIndex(truncated, " "); i > maxLen-40 {
+			truncated = truncated[:i]
 		}
-		text += "\u2026"
+		return truncated + "\u2026"
 	}
 	return text
 }
@@ -122,8 +125,9 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		args = append(args, filter.Tag)
 	}
 	if filter.Search != "" {
-		conditions = append(conditions, "(a.title LIKE ? OR a.content_clean LIKE ? OR a.content_raw LIKE ?)")
-		searchTerm := "%" + filter.Search + "%"
+		escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(filter.Search)
+		searchTerm := "%" + escaped + "%"
+		conditions = append(conditions, "(a.title LIKE ? ESCAPE '\\' OR a.content_clean LIKE ? ESCAPE '\\' OR a.content_raw LIKE ? ESCAPE '\\')")
 		args = append(args, searchTerm, searchTerm, searchTerm)
 	}
 
@@ -152,6 +156,9 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		orderBy = "COALESCE(a.published_at, a.fetched_at) DESC"
 	}
 
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
 	offset := (filter.Page - 1) * filter.Limit
 	query := fmt.Sprintf(`
 		SELECT a.id, a.feed_id, a.guid, a.title, a.url, a.author, a.content_raw, a.content_clean,

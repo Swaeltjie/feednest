@@ -4,6 +4,21 @@
 	import { getFaviconUrl } from '$lib/utils/favicon';
 	import { api } from '$lib/api/client';
 	import DOMPurify from 'isomorphic-dompurify';
+	import { isSafeUrl } from '$lib/api/client';
+
+	// Harden DOMPurify: add noreferrer to target=_blank links, strip style attrs
+	DOMPurify.addHook('afterSanitizeAttributes', (node: Element) => {
+		if (node.tagName === 'A') {
+			const href = node.getAttribute('href');
+			if (href && !isSafeUrl(href)) {
+				node.removeAttribute('href');
+			}
+			if (node.getAttribute('target') === '_blank') {
+				node.setAttribute('rel', 'noopener noreferrer');
+			}
+		}
+		node.removeAttribute('style');
+	});
 	import { blurUp } from '$lib/utils/blurload';
 
 	let {

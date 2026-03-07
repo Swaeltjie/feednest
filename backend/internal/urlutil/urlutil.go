@@ -1,10 +1,13 @@
 package urlutil
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // AllowPrivate can be set to true in tests to skip the private IP check.
@@ -47,10 +50,47 @@ func IsSafeURL(rawURL string) error {
 		if ip == nil {
 			continue
 		}
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		if isPrivateIP(ip) {
 			return fmt.Errorf("private/internal IP addresses are not allowed")
 		}
 	}
 
 	return nil
+}
+
+func isPrivateIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified()
+}
+
+// SafeHTTPClient returns an http.Client that validates resolved IPs
+// at connection time, preventing DNS rebinding attacks.
+func SafeHTTPClient(timeout time.Duration) *http.Client {
+	if AllowPrivate {
+		return &http.Client{Timeout: timeout}
+	}
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			ips, err := net.LookupHost(host)
+			if err != nil {
+				return nil, err
+			}
+			for _, ipStr := range ips {
+				ip := net.ParseIP(ipStr)
+				if ip != nil && isPrivateIP(ip) {
+					return nil, fmt.Errorf("connection to private IP %s is not allowed", ipStr)
+				}
+			}
+			// Connect to the first resolved IP to pin it
+			if len(ips) > 0 {
+				addr = net.JoinHostPort(ips[0], port)
+			}
+			return dialer.DialContext(ctx, network, addr)
+		},
+	}
+	return &http.Client{Timeout: timeout, Transport: transport}
 }

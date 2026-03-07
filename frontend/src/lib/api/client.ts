@@ -10,6 +10,15 @@ export function getAccessToken(): string | null {
 	return accessToken;
 }
 
+export function isSafeUrl(url: string): boolean {
+	try {
+		const parsed = new URL(url);
+		return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+	} catch {
+		return false;
+	}
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
@@ -49,7 +58,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 	return res.json();
 }
 
+let refreshPromise: Promise<boolean> | null = null;
+
 async function refreshTokenFn(): Promise<boolean> {
+	if (refreshPromise) return refreshPromise;
+	refreshPromise = doRefresh().finally(() => {
+		refreshPromise = null;
+	});
+	return refreshPromise;
+}
+
+async function doRefresh(): Promise<boolean> {
 	const refreshTok = localStorage.getItem('feednest_refresh_token');
 	if (!refreshTok) return false;
 

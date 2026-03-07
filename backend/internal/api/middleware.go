@@ -22,7 +22,7 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			claims, err := validateToken(tokenStr, jwtSecret)
+			claims, err := validateToken(tokenStr, jwtSecret, "access")
 			if err != nil {
 				http.Error(w, `{"error":"invalid or expired token"}`, http.StatusUnauthorized)
 				return

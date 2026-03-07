@@ -37,6 +37,9 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	if p := r.URL.Query().Get("page"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			if v > 10000 {
+				v = 10000
+			}
 			filter.Page = v
 		}
 	}
@@ -54,6 +57,9 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 		filter.CategoryID = &id
 	}
 	if search := r.URL.Query().Get("search"); search != "" {
+		if len(search) > 200 {
+			search = search[:200]
+		}
 		filter.Search = search
 	}
 
@@ -140,6 +146,11 @@ func (h *ArticleHandler) Bulk(w http.ResponseWriter, r *http.Request) {
 	var req models.BulkArticleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if len(req.ArticleIDs) > 500 {
+		http.Error(w, `{"error":"too many article IDs, max 500"}`, http.StatusBadRequest)
 		return
 	}
 

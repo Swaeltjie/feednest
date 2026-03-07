@@ -2,6 +2,7 @@ package readability
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -11,6 +12,8 @@ import (
 	"github.com/feednest/backend/internal/urlutil"
 	goreadability "github.com/go-shiori/go-readability"
 )
+
+const maxArticleResponseSize = 5 * 1024 * 1024 // 5MB
 
 const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
@@ -32,7 +35,7 @@ func ExtractContent(articleURL string) (string, error) {
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := urlutil.SafeHTTPClient(30 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch %s: %w", articleURL, err)
@@ -43,7 +46,8 @@ func ExtractContent(articleURL string) (string, error) {
 		return "", fmt.Errorf("unexpected status %d for %s", resp.StatusCode, articleURL)
 	}
 
-	article, err := goreadability.FromReader(resp.Body, parsedURL)
+	limitedBody := io.LimitReader(resp.Body, maxArticleResponseSize)
+	article, err := goreadability.FromReader(limitedBody, parsedURL)
 	if err != nil {
 		return "", err
 	}

@@ -23,9 +23,8 @@ func main() {
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "change-me-in-production"
-		log.Println("WARNING: using default JWT secret. Set JWT_SECRET env var in production.")
+	if jwtSecret == "" || jwtSecret == "change-me-in-production" {
+		log.Fatal("FATAL: JWT_SECRET must be set to a strong random value (not the default)")
 	}
 
 	db, err := store.NewDB(dbPath)

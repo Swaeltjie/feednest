@@ -7,11 +7,13 @@ COPY . .
 RUN npm run build
 
 FROM node:24-alpine
+RUN addgroup -S feednest && adduser -S feednest -G feednest
 WORKDIR /app
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json .
-COPY --from=builder /app/node_modules ./node_modules
+RUN npm ci --omit=dev
 
+USER feednest
 EXPOSE 3000
 ENV PORT=3000
 

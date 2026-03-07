@@ -16,6 +16,13 @@ func NewSettingsHandler(store *store.Queries) *SettingsHandler {
 	return &SettingsHandler{store: store}
 }
 
+var allowedSettingKeys = map[string]bool{
+	"theme": true, "view_mode": true, "default_sort": true,
+	"articles_per_page": true, "auto_mark_read": true,
+	"refresh_interval": true, "language": true,
+	"font_size": true, "compact_mode": true,
+}
+
 func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID := apiutil.ExtractUserID(r)
 	settings, err := h.store.GetSettings(userID)
@@ -33,6 +40,17 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
 		return
+	}
+
+	for key, value := range settings {
+		if !allowedSettingKeys[key] {
+			http.Error(w, `{"error":"unknown setting key: `+key+`"}`, http.StatusBadRequest)
+			return
+		}
+		if len(value) > 1000 {
+			http.Error(w, `{"error":"setting value too long"}`, http.StatusBadRequest)
+			return
+		}
 	}
 
 	if err := h.store.UpdateSettings(userID, settings); err != nil {

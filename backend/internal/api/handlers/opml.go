@@ -8,6 +8,7 @@ import (
 
 	"github.com/feednest/backend/internal/apiutil"
 	"github.com/feednest/backend/internal/store"
+	"github.com/feednest/backend/internal/urlutil"
 )
 
 type OPMLHandler struct {
@@ -152,6 +153,9 @@ func (h *OPMLHandler) Import(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if err := urlutil.IsSafeURL(f.XMLURL); err != nil {
+			continue
+		}
 		_, err := h.store.CreateFeed(userID, f.XMLURL, f.Title, f.HTMLURL, "", categoryID)
 		if err == nil {
 			imported++

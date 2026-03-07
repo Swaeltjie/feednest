@@ -53,6 +53,10 @@ func (h *TagHandler) AddToArticle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"name is required"}`, http.StatusBadRequest)
 		return
 	}
+	if len(req.Name) > 255 {
+		http.Error(w, `{"error":"tag name must not exceed 255 characters"}`, http.StatusBadRequest)
+		return
+	}
 
 	if err := h.store.AddTagToArticle(userID, articleID, req.Name); err != nil {
 		http.Error(w, `{"error":"failed to add tag"}`, http.StatusInternalServerError)

@@ -10,7 +10,7 @@
 	import KeyboardHints from '$lib/components/KeyboardHints.svelte';
 	import { articles, type ArticleFilters } from '$lib/stores/articles';
 	import { feeds, categories } from '$lib/stores/feeds';
-	import { api } from '$lib/api/client';
+	import { api, isSafeUrl } from '$lib/api/client';
 	import { setupKeyboardShortcuts } from '$lib/utils/keyboard';
 
 	type ViewMode = 'hybrid' | 'cards' | 'list';
@@ -664,7 +664,7 @@
 	onOpenExternal={() => {
 		if (openArticleId) {
 			const a = $articles.articles.find(a => a.id === openArticleId);
-			if (a?.url) window.open(a.url, '_blank', 'noopener');
+			if (a?.url && isSafeUrl(a.url)) window.open(a.url, '_blank', 'noopener,noreferrer');
 		}
 	}}
 />

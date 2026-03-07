@@ -17,6 +17,18 @@ func (q *Queries) CreateCategory(userID int64, name string, position int) (*mode
 	return &models.Category{ID: id, UserID: userID, Name: name, Position: position}, nil
 }
 
+func (q *Queries) GetCategory(id, userID int64) (*models.Category, error) {
+	var c models.Category
+	err := q.db.QueryRow(
+		"SELECT id, user_id, name, position FROM categories WHERE id = ? AND user_id = ?",
+		id, userID,
+	).Scan(&c.ID, &c.UserID, &c.Name, &c.Position)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 func (q *Queries) ListCategories(userID int64) ([]models.Category, error) {
 	rows, err := q.db.Query(
 		"SELECT id, user_id, name, position FROM categories WHERE user_id = ? ORDER BY position, name",

@@ -3,8 +3,12 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/mail"
+	"regexp"
 	"time"
+	"unicode/utf8"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -14,8 +18,11 @@ import (
 	"github.com/feednest/backend/internal/store"
 )
 
+var usernameRe = regexp.MustCompile(`^[a-zA-Z0-9_\-\.]+$`)
+
 type Claims struct {
-	UserID int64 `json:"user_id"`
+	UserID    int64  `json:"user_id"`
+	TokenType string `json:"token_type"`
 	jwt.RegisteredClaims
 }
 
@@ -28,9 +35,10 @@ func NewAuthHandler(store *store.Queries, jwtSecret string) *AuthHandler {
 	return &AuthHandler{store: store, jwtSecret: jwtSecret}
 }
 
-func generateAccessToken(userID int64, secret string, duration time.Duration) (string, error) {
+func generateToken(userID int64, secret string, duration time.Duration, tokenType string) (string, error) {
 	claims := Claims{
-		UserID: userID,
+		UserID:    userID,
+		TokenType: tokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -40,8 +48,11 @@ func generateAccessToken(userID int64, secret string, duration time.Duration) (s
 	return token.SignedString([]byte(secret))
 }
 
-func validateToken(tokenStr string, secret string) (*Claims, error) {
+func validateToken(tokenStr string, secret string, expectedType string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
 		return []byte(secret), nil
 	})
 	if err != nil {
@@ -51,6 +62,9 @@ func validateToken(tokenStr string, secret string) (*Claims, error) {
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
 		return nil, errors.New("invalid token")
+	}
+	if claims.TokenType != expectedType {
+		return nil, fmt.Errorf("expected %s token, got %s", expectedType, claims.TokenType)
 	}
 	return claims, nil
 }
@@ -76,8 +90,22 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if utf8.RuneCountInString(req.Username) > 64 || !usernameRe.MatchString(req.Username) {
+		http.Error(w, `{"error":"username must be 1-64 chars, alphanumeric/underscore/dash/dot only"}`, http.StatusBadRequest)
+		return
+	}
+
+	if _, err := mail.ParseAddress(req.Email); err != nil || len(req.Email) > 254 {
+		http.Error(w, `{"error":"invalid email address"}`, http.StatusBadRequest)
+		return
+	}
+
 	if len(req.Password) < 8 {
 		http.Error(w, `{"error":"password must be at least 8 characters"}`, http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) > 72 {
+		http.Error(w, `{"error":"password must not exceed 72 characters"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -93,13 +121,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := generateAccessToken(user.ID, h.jwtSecret, 24*time.Hour)
+	accessToken, err := generateToken(user.ID, h.jwtSecret, 24*time.Hour, "access")
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
 
-	refreshToken, err := generateAccessToken(user.ID, h.jwtSecret, 7*24*time.Hour)
+	refreshToken, err := generateToken(user.ID, h.jwtSecret, 7*24*time.Hour, "refresh")
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
@@ -123,6 +151,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.Password) > 72 {
+		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
+		return
+	}
+
 	user, err := h.store.GetUserByUsername(req.Username)
 	if err != nil {
 		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
@@ -134,12 +167,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := generateAccessToken(user.ID, h.jwtSecret, 24*time.Hour)
+	accessToken, err := generateToken(user.ID, h.jwtSecret, 24*time.Hour, "access")
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
 	}
-	refreshToken, err := generateAccessToken(user.ID, h.jwtSecret, 7*24*time.Hour)
+	refreshToken, err := generateToken(user.ID, h.jwtSecret, 7*24*time.Hour, "refresh")
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
@@ -164,13 +197,13 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, err := validateToken(body.RefreshToken, h.jwtSecret)
+	claims, err := validateToken(body.RefreshToken, h.jwtSecret, "refresh")
 	if err != nil {
 		http.Error(w, `{"error":"invalid refresh token"}`, http.StatusUnauthorized)
 		return
 	}
 
-	accessToken, err := generateAccessToken(claims.UserID, h.jwtSecret, 24*time.Hour)
+	accessToken, err := generateToken(claims.UserID, h.jwtSecret, 24*time.Hour, "access")
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return
@@ -187,7 +220,7 @@ func (h *AuthHandler) UserCount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]int{"count": count})
+	json.NewEncoder(w).Encode(map[string]interface{}{"count": count, "has_users": count > 0})
 }
 
 // ExtractUserID extracts the authenticated user ID from the request context.

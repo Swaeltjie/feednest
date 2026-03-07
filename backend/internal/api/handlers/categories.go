@@ -45,6 +45,10 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"name is required"}`, http.StatusBadRequest)
 		return
 	}
+	if len(req.Name) > 255 {
+		http.Error(w, `{"error":"name must not exceed 255 characters"}`, http.StatusBadRequest)
+		return
+	}
 
 	cat, err := h.store.CreateCategory(userID, req.Name, req.Position)
 	if err != nil {

@@ -3,6 +3,8 @@
 	import { articles } from '$lib/stores/articles';
 	import { timeAgo } from '$lib/utils/time';
 	import { getFaviconUrl } from '$lib/utils/favicon';
+	import { getFeedColor } from '$lib/utils/color';
+	import { starBurst } from '$lib/utils/particles';
 
 	let {
 		article,
@@ -18,15 +20,25 @@
 		onOpen(article.id);
 	}
 
-	function handleStar(e: Event) {
+	function handleStar(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
+		const wasStarred = article.is_starred;
 		articles.toggleStar(article.id, !article.is_starred);
+		if (!wasStarred) {
+			starBurst(e.clientX, e.clientY);
+		}
 		starAnimating = true;
 		setTimeout(() => (starAnimating = false), 200);
 	}
 
 	let feedIcon = $derived(getFaviconUrl(article.feed_icon_url, article.url, undefined));
+
+	let feedAccentColor = $state('');
+
+	$effect(() => {
+		getFeedColor(article.feed_icon_url, article.url).then(c => { feedAccentColor = c; });
+	});
 </script>
 
 <a
@@ -36,9 +48,8 @@
 		border-b border-[var(--color-border)]
 		hover:bg-[var(--color-elevated)] hover:shadow-md
 		{article.is_read ? 'opacity-60 hover:opacity-90' : ''}
-		{!article.is_read ? 'unread-accent' : 'border-l-3 border-l-transparent'}
 		{selected ? 'bg-[var(--color-accent-glow)] ring-1 ring-inset ring-[var(--color-accent)]/30' : ''}"
-	style="animation-delay: {index * 30}ms;"
+	style="animation-delay: {index * 30}ms; border-left: 3px solid {feedAccentColor || 'transparent'};"
 >
 	<!-- Thumbnail -->
 	{#if article.thumbnail_url}

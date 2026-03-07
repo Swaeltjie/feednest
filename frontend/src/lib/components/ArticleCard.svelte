@@ -3,7 +3,10 @@
 	import { articles } from '$lib/stores/articles';
 	import { timeAgo } from '$lib/utils/time';
 	import { getFaviconUrl } from '$lib/utils/favicon';
+	import { getFeedColor } from '$lib/utils/color';
 	import { magneticHover } from '$lib/utils/parallax';
+	import { blurUp } from '$lib/utils/blurload';
+	import { starBurst } from '$lib/utils/particles';
 
 	let {
 		article,
@@ -17,20 +20,30 @@
 		onOpen(article.id);
 	}
 
-	function handleStar(e: Event) {
+	function handleStar(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
+		const wasStarred = article.is_starred;
 		articles.toggleStar(article.id, !article.is_starred);
+		if (!wasStarred) {
+			starBurst(e.clientX, e.clientY);
+		}
 	}
 
 	let starAnimating = $state(false);
-	function handleStarWithBounce(e: Event) {
+	function handleStarWithBounce(e: MouseEvent) {
 		handleStar(e);
 		starAnimating = true;
 		setTimeout(() => (starAnimating = false), 200);
 	}
 
 	let feedIcon = $derived(getFaviconUrl(article.feed_icon_url, article.url, undefined));
+
+	let feedAccentColor = $state('');
+
+	$effect(() => {
+		getFeedColor(article.feed_icon_url, article.url).then(c => { feedAccentColor = c; });
+	});
 </script>
 
 <a
@@ -38,7 +51,7 @@
 	onclick={handleClick}
 	use:magneticHover={{ strength: 5 }}
 	class="group relative block rounded-2xl overflow-hidden glass-card fade-in-up"
-	style="animation-delay: {index * 60}ms; min-height: 280px;"
+	style="animation-delay: {index * 60}ms; min-height: 280px; border-bottom: 2px solid {feedAccentColor || 'transparent'};"
 	class:ring-2={selected}
 	class:ring-blue-500={selected}
 >
@@ -49,6 +62,7 @@
 			alt=""
 			class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
 			loading="lazy"
+			use:blurUp
 		/>
 	{:else}
 		<div class="absolute inset-0 accent-gradient opacity-20"></div>

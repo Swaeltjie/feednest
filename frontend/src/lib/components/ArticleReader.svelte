@@ -5,6 +5,7 @@
 	import { api } from '$lib/api/client';
 	import { onMount } from 'svelte';
 	import DOMPurify from 'isomorphic-dompurify';
+	import { blurUp } from '$lib/utils/blurload';
 
 	let {
 		articleId,
@@ -258,7 +259,7 @@
 			<!-- Hero image -->
 			{#if article.thumbnail_url}
 				<div class="relative w-full h-56 overflow-hidden">
-					<img src={article.thumbnail_url} alt="" class="w-full h-full object-cover" />
+					<img src={article.thumbnail_url} alt="" class="w-full h-full object-cover" use:blurUp />
 					<div class="absolute inset-0 hero-overlay"></div>
 				</div>
 			{/if}

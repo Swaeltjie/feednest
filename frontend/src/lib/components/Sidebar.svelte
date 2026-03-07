@@ -2,6 +2,7 @@
 	import { feeds, categories, type Feed, type Category } from '$lib/stores/feeds';
 	import { auth } from '$lib/stores/auth';
 	import { getFaviconUrl } from '$lib/utils/favicon';
+	import AnimatedCount from './AnimatedCount.svelte';
 
 	let {
 		collapsed = false,
@@ -218,7 +219,7 @@
 			</span>
 			{#if allUnread > 0}
 				<span class="px-2 py-0.5 text-xs font-semibold rounded-full accent-gradient text-white min-w-[1.25rem] text-center">
-					{allUnread}
+					<AnimatedCount value={allUnread} />
 				</span>
 			{/if}
 		</button>
@@ -280,7 +281,7 @@
 						</span>
 						{#if catUnread > 0}
 							<span class="ml-1 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
-								{catUnread}
+								<AnimatedCount value={catUnread} />
 							</span>
 						{/if}
 					</button>
@@ -314,7 +315,7 @@
 								</span>
 								{#if feed.unread_count > 0}
 									<span class="ml-2 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
-										{feed.unread_count}
+										<AnimatedCount value={feed.unread_count} />
 									</span>
 								{/if}
 							</button>
@@ -361,7 +362,7 @@
 						</span>
 						{#if feed.unread_count > 0}
 							<span class="ml-2 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
-								{feed.unread_count}
+								<AnimatedCount value={feed.unread_count} />
 							</span>
 						{/if}
 					</button>

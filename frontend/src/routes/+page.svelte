@@ -42,6 +42,8 @@
 	let refreshCountdown = $state(300);
 	let refreshInterval: ReturnType<typeof setInterval> | undefined;
 	let countdownInterval: ReturnType<typeof setInterval> | undefined;
+	let scrollY = $state(0);
+	let headerCompact = $derived(scrollY > 80);
 
 	const FEATURED_COUNT = 3;
 
@@ -274,6 +276,8 @@
 	<title>{pageTitle} - FeedNest</title>
 </svelte:head>
 
+<svelte:window bind:scrollY={scrollY} />
+
 <div class="flex h-screen" style="background: var(--color-surface);">
 	<!-- Mobile sidebar overlay -->
 	{#if mobileMenuOpen}
@@ -317,8 +321,8 @@
 	<!-- Main content -->
 	<div class="flex-1 flex flex-col min-w-0">
 		<!-- Frosted glass toolbar -->
-		<header class="sticky top-0 z-30 glass">
-			<div class="flex items-center justify-between px-4 py-3">
+		<header class="sticky top-0 z-30 glass" style="transition: padding var(--duration-snappy) var(--spring-snappy);">
+			<div class="flex items-center justify-between px-4 {headerCompact ? 'py-2' : 'py-3'}" style="transition: padding var(--duration-snappy) var(--spring-snappy);">
 				<div class="flex items-center gap-4">
 					<!-- Mobile hamburger -->
 					<button
@@ -343,18 +347,23 @@
 					</button>
 
 					<!-- Filter tabs with gradient underline -->
-					<div class="flex items-center gap-1">
-						{#each filterTabs as tab}
-							<button
-								onclick={() => (filterTab = tab.value)}
-								class="relative px-3 py-1.5 text-sm font-medium transition-colors
-									{filterTab === tab.value
-										? 'text-[var(--color-text-primary)] accent-underline'
-										: 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'}"
-							>
-								{tab.label}
-							</button>
-						{/each}
+					<div
+						class="transition-all overflow-hidden"
+						style="max-height: {headerCompact ? '0px' : '60px'}; opacity: {headerCompact ? 0 : 1}; transition: max-height var(--duration-snappy) var(--spring-snappy), opacity var(--duration-snappy) var(--spring-snappy);"
+					>
+						<div class="flex items-center gap-1">
+							{#each filterTabs as tab}
+								<button
+									onclick={() => (filterTab = tab.value)}
+									class="relative px-3 py-1.5 text-sm font-medium transition-colors
+										{filterTab === tab.value
+											? 'text-[var(--color-text-primary)] accent-underline'
+											: 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'}"
+								>
+									{tab.label}
+								</button>
+							{/each}
+						</div>
 					</div>
 				</div>
 

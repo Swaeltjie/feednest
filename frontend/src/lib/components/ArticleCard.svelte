@@ -3,6 +3,7 @@
 	import { articles } from '$lib/stores/articles';
 	import { timeAgo } from '$lib/utils/time';
 	import { getFaviconUrl } from '$lib/utils/favicon';
+	import { magneticHover } from '$lib/utils/parallax';
 
 	let {
 		article,
@@ -35,6 +36,7 @@
 <a
 	href="/article/{article.id}"
 	onclick={handleClick}
+	use:magneticHover={{ strength: 5 }}
 	class="group relative block rounded-2xl overflow-hidden glass-card fade-in-up"
 	style="animation-delay: {index * 60}ms; min-height: 280px;"
 	class:ring-2={selected}

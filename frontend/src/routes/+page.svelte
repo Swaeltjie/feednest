@@ -525,11 +525,13 @@
 				<SkeletonLoader mode={viewMode} />
 			{:else if $articles.articles.length === 0}
 				<!-- Empty state -->
-				<div class="flex flex-col items-center justify-center h-64 text-center px-4 fade-in-up">
-					<div class="w-20 h-20 rounded-2xl accent-gradient opacity-10 flex items-center justify-center mb-4">
-						<svg class="w-10 h-10 text-[var(--color-text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-						</svg>
+				<div class="flex flex-col items-center justify-center py-20 text-center px-4 fade-in-up">
+					<div class="animate-float mb-6">
+						<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
+							<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+							</svg>
+						</div>
 					</div>
 					<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No articles found</h2>
 					<p class="text-sm text-[var(--color-text-secondary)] mb-4">

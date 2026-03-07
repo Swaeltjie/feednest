@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="32" y="32" width="448" height="448" rx="96" ry="96" fill="url(#g1)"/>
+
+  <!-- Subtle inner glow -->
+  <rect x="48" y="48" width="416" height="416" rx="84" ry="84" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+
+  <!-- RSS wave arcs (top-right) -->
+  <g transform="translate(256, 256)" opacity="0.15">
+    <circle cx="80" cy="-80" r="160" fill="none" stroke="white" stroke-width="24" stroke-linecap="round"
+      stroke-dasharray="251.2" stroke-dashoffset="0"/>
+    <circle cx="80" cy="-80" r="110" fill="none" stroke="white" stroke-width="20" stroke-linecap="round"
+      stroke-dasharray="172.7" stroke-dashoffset="0"/>
+    <circle cx="80" cy="-80" r="60" fill="none" stroke="white" stroke-width="16" stroke-linecap="round"
+      stroke-dasharray="94.2" stroke-dashoffset="0"/>
+  </g>
+
+  <!-- Nest / home shape -->
+  <g filter="glow">
+    <!-- Open book / nest bowl -->
+    <path d="M156 320 C156 240, 200 180, 256 160 C312 180, 356 240, 356 320"
+          fill="none" stroke="white" stroke-width="28" stroke-linecap="round"/>
+
+    <!-- Left page curl -->
+    <path d="M156 320 C156 280, 180 250, 220 240 L256 232"
+          fill="none" stroke="white" stroke-width="16" stroke-linecap="round" opacity="0.7"/>
+
+    <!-- Right page curl -->
+    <path d="M356 320 C356 280, 332 250, 292 240 L256 232"
+          fill="none" stroke="white" stroke-width="16" stroke-linecap="round" opacity="0.7"/>
+
+    <!-- Signal dot (RSS origin) -->
+    <circle cx="256" cy="160" r="20" fill="white"/>
+
+    <!-- Small articles / feed lines -->
+    <line x1="216" y1="290" x2="296" y2="290" stroke="white" stroke-width="10" stroke-linecap="round" opacity="0.6"/>
+    <line x1="228" y1="310" x2="284" y2="310" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Nest base -->
+    <path d="M140 330 Q248 380 372 330" fill="none" stroke="white" stroke-width="20" stroke-linecap="round"/>
+    <path d="M160 355 Q248 395 352 355" fill="none" stroke="white" stroke-width="14" stroke-linecap="round" opacity="0.5"/>
+  </g>
+</svg>

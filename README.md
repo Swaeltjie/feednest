@@ -1,12 +1,25 @@
 <div align="center">
 
-# FeedNest
+<img src="assets/banner.svg" alt="FeedNest" width="100%"/>
 
-### Your feeds. Your rules. Beautifully organized.
+<br/>
+<br/>
 
-A blazing-fast, self-hosted RSS reader with a stunning glassmorphic UI, smart article prioritization, and a reading experience that puts content first.
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
+[![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
+[![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
-**[Quick Start](#-quick-start)** · **[Features](#-features)** · **[Screenshots](#-screenshots)** · **[API](#-api)** · **[Development](#-development)**
+**A blazing-fast, self-hosted RSS reader with a stunning glassmorphic UI,<br/>smart article ranking, and a reading experience that puts content first.**
+
+No tracking. No ads. No algorithms deciding what you see.
+
+[Quick Start](#-quick-start) ·
+[Features](#-features) ·
+[Keyboard Shortcuts](#-keyboard-shortcuts) ·
+[Tech Stack](#-tech-stack) ·
+[Development](#-development)
 
 ---
 
@@ -14,148 +27,115 @@ A blazing-fast, self-hosted RSS reader with a stunning glassmorphic UI, smart ar
 
 ## Why FeedNest?
 
-Most RSS readers feel like they stopped evolving in 2010. FeedNest brings a modern, Feedly-inspired experience to self-hosted readers — with a design system built on glassmorphism, gradient accents, and buttery-smooth animations. No tracking. No ads. No algorithms deciding what you see.
+Most RSS readers feel like they stopped evolving in 2010. FeedNest brings a modern, Feedly-inspired experience to self-hosting — built on **glassmorphism**, **gradient accents**, and **buttery-smooth animations**. It's the reading experience you deserve, on infrastructure you control.
 
-## Features
-
-### Reading Experience
-- **Feedly-style slide-in reader** — read articles in a gorgeous side panel without losing your place
-- **Three view modes** — Hybrid (hero cards + dense list), Card grid, and compact List view
-- **Smart prioritization** — articles scored by your reading patterns, not engagement metrics
-- **Clean typography** — carefully tuned prose styling with proper heading hierarchy, blockquote accents, and code block formatting
-
-### Organization
-- **Categories & tags** — organize feeds into categories, tag individual articles
-- **Inline category creation** — create new categories right from the "Add Feed" modal
-- **Smart deduplication** — same article across multiple feeds? You'll only see it once
-- **Sponsored content filtering** — automatically hides sponsored posts and advertisements
-
-### Interface
-- **Glassmorphic design** — frosted glass toolbars, gradient accents, and adaptive dark/light themes
-- **Full-text search** — instantly search across all article titles and content with debounced input
-- **Live refresh countdown** — animated circular timer shows when feeds will refresh next (click to refresh now)
-- **Keyboard shortcuts** — `j`/`k` navigate, `Enter` opens, `s` stars, `m` marks read, `v` cycles views, `/` focuses search
-- **Staggered animations** — articles fade in with carefully timed delays for a premium feel
-
-### Technical
-- **Auto-refresh** — feeds checked every 60 seconds, background sync keeps everything fresh
-- **OPML import/export** — migrate from any reader in seconds
-- **Multi-user** — JWT auth with token refresh, each user gets their own feed universe
-- **Feed icons** — automatic favicon resolution via Google's favicon API
-- **Readability extraction** — fetches full article content even from summary-only feeds
-- **Zero dependencies at runtime** — single Go binary + SQLite, no external databases needed
+<br/>
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/yourusername/feednest.git
+git clone https://github.com/Swaeltjie/feednest.git
 cd feednest
-cp .env.example .env    # Edit and set JWT_SECRET
 docker compose up -d
 ```
 
-Open **http://localhost:3000**, create your account, and add your first feed.
+Open **http://localhost:3000**, create your account, and add your first feed. That's it.
 
-### Docker Compose
+> **Tip:** Set `JWT_SECRET` to something secure in your environment before deploying.
 
-```yaml
-services:
-  backend:
-    build: ./backend
-    ports: ["8082:8082"]
-    volumes: ["./data:/data"]
-    environment:
-      - JWT_SECRET=change-me-in-production
-      - DB_PATH=/data/feednest.db
+<br/>
 
-  frontend:
-    build: ./frontend
-    ports: ["3000:3000"]
-    environment:
-      - VITE_API_URL=http://backend:8082
-```
+## Features
 
-## API
+### Reading Experience
 
-FeedNest has a full REST API. All endpoints (except auth) require a Bearer token.
+- **Feedly-style slide-in reader** — gorgeous side panel that doesn't lose your scroll position
+- **Three view modes** — Hybrid (hero cards + dense list), Card grid, or compact List
+- **Smart prioritization** — articles scored by your reading patterns, not engagement bait
+- **Beautiful typography** — tuned prose with proper headings, blockquote accents, and code formatting
+- **Content extraction** — pulls full articles even from summary-only feeds using readability
 
-### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/auth/register` | Create account (`username`, `email`, `password`) |
-| `POST` | `/api/auth/login` | Login, returns `access_token` + `refresh_token` |
-| `POST` | `/api/auth/refresh` | Refresh access token |
+### Organization
 
-### Feeds
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/feeds` | List all feeds with unread counts |
-| `POST` | `/api/feeds` | Add feed (`url`, optional `category_id`, `new_category`) |
-| `PUT` | `/api/feeds/:id` | Update feed title/category |
-| `DELETE` | `/api/feeds/:id` | Remove feed and all its articles |
+- **Categories & tags** — drag-and-drop categories, tag individual articles
+- **Inline category creation** — new categories right from the "Add Feed" modal
+- **Cross-feed deduplication** — same article in multiple feeds? You'll only see it once
+- **Ad filtering** — automatically hides sponsored posts and bot-protection pages
 
-### Articles
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/articles` | List articles (supports `search`, `status`, `sort`, `feed`, `category`, `tag`, `page`, `limit`) |
-| `GET` | `/api/articles/:id` | Get full article with content |
-| `PUT` | `/api/articles/:id` | Update read/starred status |
-| `POST` | `/api/articles/:id/dismiss` | Mark as read + log event |
-| `POST` | `/api/articles/bulk` | Bulk mark read/unread/star/unstar |
+### Interface
 
-### Categories
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/categories` | List categories |
-| `POST` | `/api/categories` | Create category |
-| `PUT` | `/api/categories/:id` | Update category |
-| `DELETE` | `/api/categories/:id` | Delete category |
+- **Glassmorphic design** — frosted glass toolbars, gradient accents, adaptive dark/light themes
+- **Full-text search** — instant debounced search across all article titles and content
+- **Live refresh timer** — animated countdown ring shows next auto-refresh (click to refresh now)
+- **Keyboard-first** — navigate, star, dismiss, and search without touching the mouse
+- **Staggered animations** — articles cascade in with timed delays for a premium feel
+- **Responsive** — works beautifully from phones to ultra-wides
 
-### Other
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET/PUT` | `/api/settings` | User preferences |
-| `POST` | `/api/opml/import` | Import OPML file |
-| `GET` | `/api/opml/export` | Export feeds as OPML |
-| `GET/POST/DELETE` | `/api/tags/*` | Tag management |
+### Self-Hosting Done Right
 
-### Search Example
+- **Single binary + SQLite** — no Postgres, no Redis, no external dependencies
+- **Multi-user** — JWT auth with automatic token refresh
+- **OPML import/export** — migrate from any reader in seconds
+- **SSRF protection** — blocks requests to private/internal networks
+- **XSS protection** — article content sanitized with DOMPurify
+- **Security headers** — X-Frame-Options, nosniff, referrer policy out of the box
+- **Full REST API** — Swagger UI included at `/api/docs`
 
-```bash
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:8082/api/articles?search=kubernetes&status=unread&sort=newest"
-```
+<br/>
 
 ## Keyboard Shortcuts
 
 | Key | Action |
-|-----|--------|
+|:---:|--------|
 | `j` / `k` | Navigate down / up |
-| `Enter` | Open article in reader panel |
-| `Escape` | Close reader panel |
+| `Enter` | Open article |
+| `Escape` | Close reader |
 | `s` | Toggle star |
 | `m` | Toggle read/unread |
-| `d` | Dismiss article |
+| `d` | Dismiss |
 | `v` | Cycle view mode |
-| `/` | Focus search bar |
+| `/` | Focus search |
+
+<br/>
+
+## Tech Stack
+
+| | Technology | Purpose |
+|-|-----------|---------|
+| | **SvelteKit 5** + Svelte 5 Runes | Reactive frontend with TypeScript |
+| | **Tailwind CSS 4** | Utility-first styling with glassmorphism |
+| | **Go** + Chi router | Fast, lightweight API server |
+| | **SQLite** (WAL mode) | Zero-config embedded database |
+| | **gofeed** + go-readability | RSS/Atom parsing + content extraction |
+| | **JWT** (HS256) | Stateless auth with refresh tokens |
+| | **Docker Compose** | One-command deployment |
+| | **DOMPurify** | XSS-safe article rendering |
+
+<br/>
 
 ## Development
 
-### Backend (Go 1.22+)
+### Prerequisites
+
+- **Go 1.22+** and **Node 20+** for local dev
+- **Docker** for containerized deployment
+
+### Local Development
 
 ```bash
-cd backend
-go run ./cmd/feednest/
-# Runs on :8082
+# Backend — runs on :8082
+cd backend && go run ./cmd/feednest/
+
+# Frontend — runs on :5173 with HMR
+cd frontend && npm install && npm run dev
 ```
 
-### Frontend (Node 20+, SvelteKit 5)
+### Docker
 
 ```bash
-cd frontend
-npm install
-npm run dev
-# Runs on :5173 with HMR
+docker compose up --build -d     # Build and run
+docker compose logs -f           # Watch logs
+docker compose down              # Stop
 ```
 
 ### Project Structure
@@ -163,35 +143,47 @@ npm run dev
 ```
 feednest/
 ├── backend/
-│   ├── cmd/feednest/          # Entry point
+│   ├── cmd/feednest/             # Entry point
 │   └── internal/
-│       ├── api/               # HTTP handlers + middleware
-│       │   └── handlers/      # Articles, feeds, categories, tags, events, settings, OPML
-│       ├── fetcher/           # RSS/Atom feed parser
-│       ├── readability/       # Article content extraction
-│       ├── scheduler/         # Background feed refresh
-│       └── store/             # SQLite queries
+│       ├── api/                  # Routes, auth, middleware, Swagger
+│       │   └── handlers/         # Request handlers
+│       ├── fetcher/              # RSS/Atom feed fetcher
+│       ├── readability/          # Full content extraction
+│       ├── scheduler/            # Background refresh
+│       ├── scorer/               # Smart article ranking
+│       ├── urlutil/              # SSRF protection
+│       └── store/                # SQLite data layer
 ├── frontend/
 │   └── src/
 │       ├── lib/
-│       │   ├── api/           # HTTP client with token refresh
-│       │   ├── components/    # Svelte 5 components (runes)
-│       │   ├── stores/        # Reactive stores (articles, feeds, auth)
-│       │   └── utils/         # Time formatting, favicons, keyboard
-│       └── routes/            # SvelteKit pages
+│       │   ├── api/              # HTTP client with token refresh
+│       │   ├── components/       # Svelte 5 components
+│       │   ├── stores/           # Reactive state management
+│       │   └── utils/            # Helpers (time, favicon, keyboard)
+│       └── routes/               # SvelteKit pages
+├── assets/                       # Logo and banner SVGs
 └── docker-compose.yml
 ```
 
-## Tech Stack
+<br/>
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | SvelteKit 5, TypeScript, Tailwind CSS 4, Svelte 5 Runes |
-| Backend | Go, Chi router, SQLite (WAL mode) |
-| Content | gofeed parser, go-readability extractor |
-| Auth | JWT (HS256) with access + refresh tokens |
-| Deploy | Docker Compose, multi-stage Alpine builds |
+## Environment Variables
 
-## License
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JWT_SECRET` | `change-me-in-production` | **Set this.** JWT signing key. |
+| `PORT` | `8080` | Backend listen port |
+| `DB_PATH` | `./feednest.db` | SQLite database path |
+| `ORIGIN` | `http://localhost:3000` | SvelteKit origin (CSRF) |
 
-MIT
+<br/>
+
+---
+
+<div align="center">
+
+**Built with obsessive attention to detail.**
+
+<sub>MIT License</sub>
+
+</div>

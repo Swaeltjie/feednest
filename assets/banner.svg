@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="50%" stop-color="#161b22"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="accent2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="400" fill="url(#bg)"/>
+
+  <!-- Ambient glow orbs -->
+  <circle cx="200" cy="200" r="200" fill="#2563eb" opacity="0.04" filter="url(#softglow)"/>
+  <circle cx="1000" cy="200" r="200" fill="#7c3aed" opacity="0.04" filter="url(#softglow)"/>
+
+  <!-- Decorative grid dots -->
+  <g opacity="0.06">
+    <pattern id="dots" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="white"/>
+    </pattern>
+    <rect width="1200" height="400" fill="url(#dots)"/>
+  </g>
+
+  <!-- Top accent line -->
+  <rect x="0" y="0" width="1200" height="3" fill="url(#accent)"/>
+
+  <!-- Logo icon (compact version) -->
+  <g transform="translate(340, 100) scale(0.4)" filter="url(#glow)">
+    <!-- Rounded square bg -->
+    <rect x="32" y="32" width="448" height="448" rx="96" ry="96" fill="url(#accent)"/>
+
+    <!-- Nest shape -->
+    <path d="M156 320 C156 240, 200 180, 256 160 C312 180, 356 240, 356 320"
+          fill="none" stroke="white" stroke-width="28" stroke-linecap="round"/>
+    <circle cx="256" cy="160" r="20" fill="white"/>
+    <line x1="216" y1="290" x2="296" y2="290" stroke="white" stroke-width="10" stroke-linecap="round" opacity="0.6"/>
+    <line x1="228" y1="310" x2="284" y2="310" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.4"/>
+    <path d="M140 330 Q248 380 372 330" fill="none" stroke="white" stroke-width="20" stroke-linecap="round"/>
+    <path d="M160 355 Q248 395 352 355" fill="none" stroke="white" stroke-width="14" stroke-linecap="round" opacity="0.5"/>
+  </g>
+
+  <!-- Title text -->
+  <text x="580" y="220" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="80" font-weight="800" fill="white" letter-spacing="-3">
+    FeedNest
+  </text>
+
+  <!-- Tagline -->
+  <text x="582" y="262" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="20" fill="#8b949e" letter-spacing="0.5">
+    Your feeds. Your rules. Beautifully organized.
+  </text>
+
+  <!-- Tech badges row -->
+  <g transform="translate(580, 290)">
+    <!-- Go badge -->
+    <rect x="0" y="0" width="50" height="26" rx="6" fill="#1c2128" stroke="#30363d" stroke-width="1"/>
+    <text x="25" y="17" font-family="system-ui, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">Go</text>
+
+    <!-- Svelte badge -->
+    <rect x="60" y="0" width="72" height="26" rx="6" fill="#1c2128" stroke="#30363d" stroke-width="1"/>
+    <text x="96" y="17" font-family="system-ui, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">Svelte 5</text>
+
+    <!-- SQLite badge -->
+    <rect x="142" y="0" width="62" height="26" rx="6" fill="#1c2128" stroke="#30363d" stroke-width="1"/>
+    <text x="173" y="17" font-family="system-ui, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">SQLite</text>
+
+    <!-- Docker badge -->
+    <rect x="214" y="0" width="68" height="26" rx="6" fill="#1c2128" stroke="#30363d" stroke-width="1"/>
+    <text x="248" y="17" font-family="system-ui, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">Docker</text>
+
+    <!-- Self-hosted badge -->
+    <rect x="292" y="0" width="96" height="26" rx="6" fill="#1c2128" stroke="#30363d" stroke-width="1"/>
+    <text x="340" y="17" font-family="system-ui, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">Self-Hosted</text>
+  </g>
+
+  <!-- Bottom accent line -->
+  <rect x="0" y="397" width="1200" height="3" fill="url(#accent)"/>
+</svg>

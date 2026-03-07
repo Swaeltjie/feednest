@@ -27,7 +27,9 @@
 
 	let contextMenu = $state<{ feed: Feed; x: number; y: number } | null>(null);
 	let deletingFeedId = $state<number | null>(null);
+	// Start with all categories collapsed; populated once categories load
 	let collapsedCategories = $state<Set<number>>(new Set());
+	let initializedCollapsed = $state(false);
 
 	// Drag and drop state
 	let draggedFeed = $state<Feed | null>(null);
@@ -64,6 +66,14 @@
 	}
 
 	let feedsByCategory = $derived(groupByCategory($feeds, $categories));
+
+	// Collapse all categories by default on first load
+	$effect(() => {
+		if (!initializedCollapsed && $categories.length > 0) {
+			collapsedCategories = new Set($categories.map(c => c.id));
+			initializedCollapsed = true;
+		}
+	});
 
 	function totalUnread(feedList: Feed[]): number {
 		return feedList.reduce((sum, f) => sum + f.unread_count, 0);

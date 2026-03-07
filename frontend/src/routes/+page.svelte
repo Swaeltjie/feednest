@@ -39,7 +39,7 @@
 	let selectedIndex = $state(-1);
 	let cleanupKeyboard: (() => void) | undefined;
 	let openArticleId = $state<number | null>(null);
-	let refreshCountdown = $state(60);
+	let refreshCountdown = $state(300);
 	let refreshInterval: ReturnType<typeof setInterval> | undefined;
 	let countdownInterval: ReturnType<typeof setInterval> | undefined;
 
@@ -165,15 +165,15 @@
 		}
 
 		// Auto-refresh every 60 seconds
-		refreshCountdown = 60;
+		refreshCountdown = 300;
 		countdownInterval = setInterval(() => {
 			refreshCountdown = Math.max(0, refreshCountdown - 1);
 		}, 1000);
 		refreshInterval = setInterval(async () => {
-			refreshCountdown = 60;
+			refreshCountdown = 300;
 			await feeds.load();
 			await articles.load(currentFilters);
-		}, 60000);
+		}, 300000);
 
 		cleanupKeyboard = setupKeyboardShortcuts({
 			j: () => {
@@ -389,7 +389,7 @@
 				<div class="flex items-center gap-3">
 					<!-- Refresh countdown -->
 					<button
-						onclick={async () => { refreshCountdown = 60; await feeds.load(); await articles.load(currentFilters); }}
+						onclick={async () => { refreshCountdown = 300; await feeds.load(); await articles.load(currentFilters); }}
 						class="group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all
 							hover:bg-[var(--color-elevated)] text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)]"
 						title="Click to refresh now"
@@ -402,7 +402,7 @@
 							<circle cx="18" cy="18" r="15" fill="none" stroke="var(--color-border)" stroke-width="3" />
 							<circle cx="18" cy="18" r="15" fill="none" stroke="var(--color-accent)" stroke-width="3"
 								stroke-dasharray={2 * Math.PI * 15}
-								stroke-dashoffset={2 * Math.PI * 15 * (1 - refreshCountdown / 60)}
+								stroke-dashoffset={2 * Math.PI * 15 * (1 - refreshCountdown / 300)}
 								stroke-linecap="round"
 								transform="rotate(-90 18 18)"
 								class="transition-all duration-1000 ease-linear"

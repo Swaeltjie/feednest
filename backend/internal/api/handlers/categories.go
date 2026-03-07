@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/feednest/backend/internal/api"
+	"github.com/feednest/backend/internal/apiutil"
 	"github.com/feednest/backend/internal/models"
 	"github.com/feednest/backend/internal/store"
 )
@@ -21,7 +21,7 @@ func NewCategoryHandler(store *store.Queries) *CategoryHandler {
 }
 
 func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	cats, err := h.store.ListCategories(userID)
 	if err != nil {
 		http.Error(w, `{"error":"failed to list categories"}`, http.StatusInternalServerError)
@@ -35,7 +35,7 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	var req models.CreateCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
@@ -58,7 +58,7 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
@@ -80,7 +80,7 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CategoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)

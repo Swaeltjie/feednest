@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/feednest/backend/internal/api"
+	"github.com/feednest/backend/internal/apiutil"
 	"github.com/feednest/backend/internal/models"
 	"github.com/feednest/backend/internal/store"
 )
@@ -21,7 +21,7 @@ func NewArticleHandler(store *store.Queries) *ArticleHandler {
 }
 
 func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 
 	filter := &store.ArticleFilter{
 		Status: r.URL.Query().Get("status"),
@@ -69,7 +69,7 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArticleHandler) Get(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
@@ -87,7 +87,7 @@ func (h *ArticleHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
@@ -108,7 +108,7 @@ func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArticleHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
@@ -123,7 +123,7 @@ func (h *ArticleHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArticleHandler) Bulk(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	var req models.BulkArticleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)

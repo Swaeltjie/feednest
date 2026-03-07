@@ -1,9 +1,10 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strings"
+
+	"github.com/feednest/backend/internal/apiutil"
 )
 
 func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
@@ -27,7 +28,7 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), contextKeyUserID, claims)
+			ctx := apiutil.WithUserID(r.Context(), claims.UserID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/feednest/backend/internal/apiutil"
 	"github.com/feednest/backend/internal/models"
 	"github.com/feednest/backend/internal/store"
 )
@@ -172,13 +173,7 @@ func (h *AuthHandler) UserCount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]int{"count": count})
 }
 
+// ExtractUserID extracts the authenticated user ID from the request context.
 func ExtractUserID(r *http.Request) int64 {
-	if claims, ok := r.Context().Value(contextKeyUserID).(*Claims); ok {
-		return claims.UserID
-	}
-	return 0
+	return apiutil.ExtractUserID(r)
 }
-
-type contextKey string
-
-const contextKeyUserID contextKey = "user_claims"

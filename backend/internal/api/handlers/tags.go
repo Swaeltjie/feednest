@@ -1,0 +1,72 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/feednest/backend/internal/apiutil"
+	"github.com/feednest/backend/internal/models"
+	"github.com/feednest/backend/internal/store"
+)
+
+type TagHandler struct {
+	store *store.Queries
+}
+
+func NewTagHandler(store *store.Queries) *TagHandler {
+	return &TagHandler{store: store}
+}
+
+func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID := apiutil.ExtractUserID(r)
+	tags, err := h.store.ListTags(userID)
+	if err != nil {
+		http.Error(w, `{"error":"failed to list tags"}`, http.StatusInternalServerError)
+		return
+	}
+	if tags == nil {
+		tags = []models.Tag{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tags)
+}
+
+func (h *TagHandler) AddToArticle(w http.ResponseWriter, r *http.Request) {
+	userID := apiutil.ExtractUserID(r)
+	articleID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
+		return
+	}
+
+	var req models.AddTagRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+		http.Error(w, `{"error":"name is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.store.AddTagToArticle(userID, articleID, req.Name); err != nil {
+		http.Error(w, `{"error":"failed to add tag"}`, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *TagHandler) RemoveFromArticle(w http.ResponseWriter, r *http.Request) {
+	userID := apiutil.ExtractUserID(r)
+	articleID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
+		return
+	}
+	tagName := chi.URLParam(r, "tag")
+
+	if err := h.store.RemoveTagFromArticle(articleID, tagName, userID); err != nil {
+		http.Error(w, `{"error":"failed to remove tag"}`, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

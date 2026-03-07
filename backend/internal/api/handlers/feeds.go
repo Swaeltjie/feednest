@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/feednest/backend/internal/api"
+	"github.com/feednest/backend/internal/apiutil"
 	"github.com/feednest/backend/internal/models"
 	"github.com/feednest/backend/internal/store"
 )
@@ -21,7 +21,7 @@ func NewFeedHandler(store *store.Queries) *FeedHandler {
 }
 
 func (h *FeedHandler) List(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	feeds, err := h.store.ListFeeds(userID)
 	if err != nil {
 		http.Error(w, `{"error":"failed to list feeds"}`, http.StatusInternalServerError)
@@ -35,7 +35,7 @@ func (h *FeedHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *FeedHandler) Create(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	var req models.CreateFeedRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
@@ -58,7 +58,7 @@ func (h *FeedHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *FeedHandler) Update(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
@@ -79,7 +79,7 @@ func (h *FeedHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *FeedHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID := api.ExtractUserID(r)
+	userID := apiutil.ExtractUserID(r)
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)

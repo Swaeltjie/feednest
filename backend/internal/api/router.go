@@ -7,6 +7,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/feednest/backend/internal/api/handlers"
 	"github.com/feednest/backend/internal/store"
 )
 
@@ -40,7 +41,37 @@ func NewRouter(queries *store.Queries, jwtSecret string) http.Handler {
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(AuthMiddleware(jwtSecret))
-		// Handlers will be added in subsequent tasks
+
+		categoriesH := handlers.NewCategoryHandler(queries)
+		r.Get("/api/categories", categoriesH.List)
+		r.Post("/api/categories", categoriesH.Create)
+		r.Put("/api/categories/{id}", categoriesH.Update)
+		r.Delete("/api/categories/{id}", categoriesH.Delete)
+
+		feedsH := handlers.NewFeedHandler(queries)
+		r.Get("/api/feeds", feedsH.List)
+		r.Post("/api/feeds", feedsH.Create)
+		r.Put("/api/feeds/{id}", feedsH.Update)
+		r.Delete("/api/feeds/{id}", feedsH.Delete)
+
+		articlesH := handlers.NewArticleHandler(queries)
+		r.Get("/api/articles", articlesH.List)
+		r.Post("/api/articles/bulk", articlesH.Bulk)
+		r.Get("/api/articles/{id}", articlesH.Get)
+		r.Put("/api/articles/{id}", articlesH.Update)
+		r.Post("/api/articles/{id}/dismiss", articlesH.Dismiss)
+
+		tagsH := handlers.NewTagHandler(queries)
+		r.Get("/api/tags", tagsH.List)
+		r.Post("/api/articles/{id}/tags", tagsH.AddToArticle)
+		r.Delete("/api/articles/{id}/tags/{tag}", tagsH.RemoveFromArticle)
+
+		eventsH := handlers.NewEventHandler(queries)
+		r.Post("/api/events", eventsH.Create)
+
+		settingsH := handlers.NewSettingsHandler(queries)
+		r.Get("/api/settings", settingsH.Get)
+		r.Put("/api/settings", settingsH.Update)
 	})
 
 	return r

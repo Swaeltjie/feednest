@@ -9,6 +9,7 @@ export interface Article {
 	author: string;
 	content_clean: string;
 	content_raw: string;
+	snippet: string;
 	thumbnail_url: string;
 	published_at: string | null;
 	word_count: number;

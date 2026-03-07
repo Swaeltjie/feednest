@@ -4,12 +4,13 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import ArticleCard from '$lib/components/ArticleCard.svelte';
 	import ArticleList from '$lib/components/ArticleList.svelte';
+	import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { articles, type ArticleFilters } from '$lib/stores/articles';
 	import { feeds, categories } from '$lib/stores/feeds';
 	import { setupKeyboardShortcuts } from '$lib/utils/keyboard';
 
-	type ViewMode = 'cards' | 'list';
+	type ViewMode = 'hybrid' | 'cards' | 'list';
 	type FilterTab = 'all' | 'unread' | 'starred';
 	type SortOption = 'smart' | 'newest' | 'oldest';
 	type SidebarView = 'all' | 'starred' | 'feed' | 'category';
@@ -18,7 +19,7 @@
 	let mobileMenuOpen = $state(false);
 	let viewMode = $state<ViewMode>(
 		(typeof localStorage !== 'undefined' && (localStorage.getItem('feednest_view') as ViewMode)) ||
-			'cards'
+			'hybrid'
 	);
 	let filterTab = $state<FilterTab>('all');
 	let sortOption = $state<SortOption>('smart');
@@ -34,12 +35,34 @@
 	let selectedIndex = $state(-1);
 	let cleanupKeyboard: (() => void) | undefined;
 
+	const FEATURED_COUNT = 3;
+
 	let currentFilters = $derived<ArticleFilters>({
 		status: filterTab === 'unread' ? 'unread' : filterTab === 'starred' ? 'starred' : undefined,
 		sort: sortOption,
 		feed: sidebarView === 'feed' && activeFeedId ? activeFeedId : undefined,
 		category: sidebarView === 'category' && activeCategoryId ? activeCategoryId : undefined,
 	});
+
+	let featuredArticles = $derived(
+		viewMode === 'hybrid'
+			? $articles.articles.filter((a) => a.thumbnail_url).slice(0, FEATURED_COUNT)
+			: []
+	);
+
+	let featuredIds = $derived(new Set(featuredArticles.map((a) => a.id)));
+
+	let listArticles = $derived(
+		viewMode === 'hybrid'
+			? $articles.articles.filter((a) => !featuredIds.has(a.id))
+			: $articles.articles
+	);
+
+	const filterTabs: { value: FilterTab; label: string }[] = [
+		{ value: 'all', label: 'All' },
+		{ value: 'unread', label: 'Unread' },
+		{ value: 'starred', label: 'Starred' },
+	];
 
 	function setViewMode(mode: ViewMode) {
 		viewMode = mode;
@@ -153,10 +176,14 @@
 				}
 			},
 			v: () => {
-				setViewMode(viewMode === 'cards' ? 'list' : 'cards');
+				const modes: ViewMode[] = ['hybrid', 'cards', 'list'];
+				const current = modes.indexOf(viewMode);
+				setViewMode(modes[(current + 1) % modes.length]);
 			},
 			'/': () => {
-				const searchInput = document.querySelector<HTMLInputElement>('input[type="search"], input[placeholder*="earch"]');
+				const searchInput = document.querySelector<HTMLInputElement>(
+					'input[type="search"], input[placeholder*="earch"]'
+				);
 				if (searchInput) {
 					searchInput.focus();
 				}
@@ -170,7 +197,6 @@
 
 	$effect(() => {
 		if (!initialized) return;
-		// Access the derived filters to track changes
 		const filters = currentFilters;
 		articles.load(filters);
 	});
@@ -193,12 +219,12 @@
 	<title>{pageTitle()} - FeedNest</title>
 </svelte:head>
 
-<div class="flex h-screen bg-gray-50 dark:bg-gray-900">
+<div class="flex h-screen" style="background: var(--color-surface);">
 	<!-- Mobile sidebar overlay -->
 	{#if mobileMenuOpen}
 		<div class="fixed inset-0 z-40 lg:hidden">
 			<button
-				class="absolute inset-0 bg-black/50"
+				class="absolute inset-0 bg-black/60 backdrop-blur-sm"
 				onclick={() => (mobileMenuOpen = false)}
 				aria-label="Close menu"
 			></button>
@@ -235,144 +261,92 @@
 
 	<!-- Main content -->
 	<div class="flex-1 flex flex-col min-w-0">
-		<!-- Toolbar -->
-		<header
-			class="sticky top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
-		>
+		<!-- Frosted glass toolbar -->
+		<header class="sticky top-0 z-30 glass">
 			<div class="flex items-center justify-between px-4 py-3">
-				<div class="flex items-center gap-3">
+				<div class="flex items-center gap-4">
 					<!-- Mobile hamburger -->
 					<button
-						class="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+						class="lg:hidden p-1.5 rounded-lg hover:bg-[var(--color-elevated)] transition-colors"
 						onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
 						aria-label="Toggle sidebar"
 					>
-						<svg
-							class="w-5 h-5 text-gray-600 dark:text-gray-300"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 6h16M4 12h16M4 18h16"
-							/>
+						<svg class="w-5 h-5 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 						</svg>
 					</button>
 
 					<!-- Desktop sidebar toggle -->
 					<button
-						class="hidden lg:block p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+						class="hidden lg:block p-1.5 rounded-lg hover:bg-[var(--color-elevated)] transition-colors"
 						onclick={() => (sidebarCollapsed = !sidebarCollapsed)}
 						aria-label="Toggle sidebar"
 					>
-						<svg
-							class="w-5 h-5 text-gray-600 dark:text-gray-300"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 6h16M4 12h16M4 18h16"
-							/>
+						<svg class="w-5 h-5 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 						</svg>
 					</button>
 
-					<!-- Filter tabs -->
-					<div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
-						<button
-							onclick={() => (filterTab = 'all')}
-							class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filterTab ===
-							'all'
-								? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-								: 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
-						>
-							All
-						</button>
-						<button
-							onclick={() => (filterTab = 'unread')}
-							class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filterTab ===
-							'unread'
-								? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-								: 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
-						>
-							Unread
-						</button>
-						<button
-							onclick={() => (filterTab = 'starred')}
-							class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filterTab ===
-							'starred'
-								? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-								: 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
-						>
-							Starred
-						</button>
+					<!-- Filter tabs with gradient underline -->
+					<div class="flex items-center gap-1">
+						{#each filterTabs as tab}
+							<button
+								onclick={() => (filterTab = tab.value)}
+								class="relative px-3 py-1.5 text-sm font-medium transition-colors
+									{filterTab === tab.value
+										? 'text-[var(--color-text-primary)] accent-underline'
+										: 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'}"
+							>
+								{tab.label}
+							</button>
+						{/each}
 					</div>
 				</div>
 
 				<div class="flex items-center gap-3">
-					<!-- Sort dropdown -->
+					<!-- Sort -->
 					<select
 						bind:value={sortOption}
-						class="text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500"
+						class="text-sm rounded-lg px-3 py-1.5 border transition-colors cursor-pointer
+							bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-text-secondary)]
+							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
 					>
 						<option value="smart">Smart</option>
 						<option value="newest">Newest</option>
 						<option value="oldest">Oldest</option>
 					</select>
 
-					<!-- View toggle -->
-					<div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
+					<!-- View toggle (3 modes) -->
+					<div class="flex items-center gap-0.5 p-0.5 rounded-lg" style="background: var(--color-border);">
+						<button
+							onclick={() => setViewMode('hybrid')}
+							class="p-1.5 rounded-md transition-all {viewMode === 'hybrid' ? 'bg-[var(--color-card)] shadow-sm' : 'hover:bg-[var(--color-card)]/50'}"
+							title="Hybrid view"
+						>
+							<svg class="w-4 h-4 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h5a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+							</svg>
+						</button>
 						<button
 							onclick={() => setViewMode('cards')}
-							class="p-1.5 rounded-md transition-colors {viewMode === 'cards'
-								? 'bg-white dark:bg-gray-600 shadow-sm'
-								: ''}"
+							class="p-1.5 rounded-md transition-all {viewMode === 'cards' ? 'bg-[var(--color-card)] shadow-sm' : 'hover:bg-[var(--color-card)]/50'}"
 							title="Card view"
 						>
-							<svg
-								class="w-4 h-4 text-gray-600 dark:text-gray-300"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-								/>
+							<svg class="w-4 h-4 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
 							</svg>
 						</button>
 						<button
 							onclick={() => setViewMode('list')}
-							class="p-1.5 rounded-md transition-colors {viewMode === 'list'
-								? 'bg-white dark:bg-gray-600 shadow-sm'
-								: ''}"
+							class="p-1.5 rounded-md transition-all {viewMode === 'list' ? 'bg-[var(--color-card)] shadow-sm' : 'hover:bg-[var(--color-card)]/50'}"
 							title="List view"
 						>
-							<svg
-								class="w-4 h-4 text-gray-600 dark:text-gray-300"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M4 6h16M4 12h16M4 18h16"
-								/>
+							<svg class="w-4 h-4 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 							</svg>
 						</button>
 					</div>
 
-					<!-- Theme toggle -->
 					<ThemeToggle />
 				</div>
 			</div>
@@ -381,27 +355,17 @@
 		<!-- Article content -->
 		<main class="flex-1 overflow-y-auto">
 			{#if $articles.loading && !initialized}
-				<div class="flex items-center justify-center h-64">
-					<div class="text-gray-500 dark:text-gray-400">Loading articles...</div>
-				</div>
+				<SkeletonLoader mode={viewMode} />
 			{:else if $articles.articles.length === 0}
 				<!-- Empty state -->
-				<div class="flex flex-col items-center justify-center h-64 text-center px-4">
-					<svg
-						class="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="1.5"
-							d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"
-						/>
-					</svg>
-					<h2 class="text-lg font-medium text-gray-900 dark:text-white mb-1">No articles found</h2>
-					<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+				<div class="flex flex-col items-center justify-center h-64 text-center px-4 fade-in-up">
+					<div class="w-20 h-20 rounded-2xl accent-gradient opacity-10 flex items-center justify-center mb-4">
+						<svg class="w-10 h-10 text-[var(--color-text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+						</svg>
+					</div>
+					<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No articles found</h2>
+					<p class="text-sm text-[var(--color-text-secondary)] mb-4">
 						{#if $feeds.length === 0}
 							Add a feed to get started.
 						{:else}
@@ -411,44 +375,58 @@
 					{#if $feeds.length === 0}
 						<button
 							onclick={openAddFeed}
-							class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+							class="px-5 py-2.5 text-sm font-medium text-white rounded-xl accent-gradient hover:opacity-90 transition-opacity shadow-lg shadow-blue-500/25"
 						>
 							Add Your First Feed
 						</button>
 					{/if}
 				</div>
-			{:else if viewMode === 'cards'}
-				<!-- Card grid view -->
-				<div
-					class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4"
-				>
-					{#each $articles.articles as article, i (article.id)}
-						<ArticleCard {article} selected={i === selectedIndex} />
-					{/each}
-				</div>
 			{:else}
-				<!-- List view -->
-				<div class="bg-white dark:bg-gray-800">
-					{#each $articles.articles as article, i (article.id)}
-						<ArticleList {article} selected={i === selectedIndex} />
-					{/each}
-				</div>
-			{/if}
+				<!-- Hybrid view: featured heroes + dense list -->
+				{#if viewMode === 'hybrid'}
+					{#if featuredArticles.length > 0}
+						<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+							{#each featuredArticles as article, i (article.id)}
+								<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} />
+							{/each}
+						</div>
+					{/if}
+					<div style="background: var(--color-card);" class="rounded-t-2xl mx-2 mt-2">
+						{#each listArticles as article, i (article.id)}
+							<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} />
+						{/each}
+					</div>
 
-			<!-- Loading indicator for filter changes -->
-			{#if $articles.loading && initialized}
-				<div class="flex items-center justify-center py-4">
-					<div
-						class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-					></div>
-				</div>
-			{/if}
+				<!-- All cards view -->
+				{:else if viewMode === 'cards'}
+					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+						{#each $articles.articles as article, i (article.id)}
+							<ArticleCard {article} selected={i === selectedIndex} index={i} />
+						{/each}
+					</div>
 
-			<!-- Article count footer -->
-			{#if $articles.articles.length > 0}
-				<div class="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
-					Showing {$articles.articles.length} of {$articles.total} articles
-				</div>
+				<!-- All list view -->
+				{:else}
+					<div style="background: var(--color-card);" class="m-2 rounded-2xl overflow-hidden">
+						{#each $articles.articles as article, i (article.id)}
+							<ArticleList {article} selected={i === selectedIndex} index={i} />
+						{/each}
+					</div>
+				{/if}
+
+				<!-- Loading indicator for filter changes -->
+				{#if $articles.loading && initialized}
+					<div class="flex items-center justify-center py-4">
+						<div class="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin"></div>
+					</div>
+				{/if}
+
+				<!-- Article count footer -->
+				{#if $articles.articles.length > 0}
+					<div class="text-center py-4 text-sm text-[var(--color-text-tertiary)]">
+						Showing {$articles.articles.length} of {$articles.total} articles
+					</div>
+				{/if}
 			{/if}
 		</main>
 	</div>
@@ -458,28 +436,21 @@
 {#if showAddFeedModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
 		<button
-			class="absolute inset-0 bg-black/50"
+			class="absolute inset-0 bg-black/60 backdrop-blur-sm"
 			onclick={() => (showAddFeedModal = false)}
 			aria-label="Close modal"
 		></button>
-		<div
-			class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6 space-y-4"
-		>
-			<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Add Feed</h2>
+		<div class="relative glass rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 fade-in-up">
+			<h2 class="text-lg font-semibold text-[var(--color-text-primary)]">Add Feed</h2>
 
 			{#if addFeedError}
-				<div
-					class="p-3 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg"
-				>
+				<div class="p-3 text-sm text-red-400 bg-red-500/10 rounded-xl border border-red-500/20">
 					{addFeedError}
 				</div>
 			{/if}
 
 			<div>
-				<label
-					for="feed-url"
-					class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-				>
+				<label for="feed-url" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
 					Feed URL
 				</label>
 				<input
@@ -487,21 +458,22 @@
 					type="url"
 					bind:value={feedUrl}
 					placeholder="https://example.com/feed.xml"
-					class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]
+						text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
+						focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
 				/>
 			</div>
 
 			<div>
-				<label
-					for="feed-category"
-					class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-				>
+				<label for="feed-category" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
 					Category (optional)
 				</label>
 				<select
 					id="feed-category"
 					bind:value={feedCategoryId}
-					class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]
+						text-[var(--color-text-primary)]
+						focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
 				>
 					<option value={undefined}>None</option>
 					{#each $categories as cat}
@@ -513,14 +485,17 @@
 			<div class="flex justify-end gap-3 pt-2">
 				<button
 					onclick={() => (showAddFeedModal = false)}
-					class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+					class="px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)]
+						hover:bg-[var(--color-elevated)] rounded-xl transition-colors"
 				>
 					Cancel
 				</button>
 				<button
 					onclick={handleAddFeed}
 					disabled={addingFeed || !feedUrl.trim()}
-					class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="px-5 py-2 text-sm font-medium text-white rounded-xl accent-gradient
+						hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity
+						shadow-lg shadow-blue-500/25"
 				>
 					{addingFeed ? 'Adding...' : 'Add Feed'}
 				</button>

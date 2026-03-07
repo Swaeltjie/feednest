@@ -27,8 +27,9 @@
 </svelte:head>
 
 {#if $auth.loading}
-	<div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-		<div class="text-gray-500 dark:text-gray-400">Loading...</div>
+	<div class="min-h-screen flex flex-col items-center justify-center" style="background: var(--color-surface);">
+		<h1 class="text-2xl font-bold accent-gradient-text mb-4">FeedNest</h1>
+		<div class="w-6 h-6 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin"></div>
 	</div>
 {:else}
 	{@render children()}

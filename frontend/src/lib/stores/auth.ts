@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { browser } from '$app/environment';
 import { api, setAccessToken, getAccessToken } from '$lib/api/client';
 
 interface User {
@@ -29,7 +30,7 @@ function createAuthStore() {
 				{ username, password }
 			);
 			setAccessToken(data.access_token);
-			localStorage.setItem('feednest_refresh_token', data.refresh_token);
+			if (browser) localStorage.setItem('feednest_refresh_token', data.refresh_token);
 			set({ user: data.user, isAuthenticated: true, loading: false });
 		},
 
@@ -39,17 +40,21 @@ function createAuthStore() {
 				{ username, email, password }
 			);
 			setAccessToken(data.access_token);
-			localStorage.setItem('feednest_refresh_token', data.refresh_token);
+			if (browser) localStorage.setItem('feednest_refresh_token', data.refresh_token);
 			set({ user: data.user, isAuthenticated: true, loading: false });
 		},
 
 		logout() {
 			setAccessToken(null);
-			localStorage.removeItem('feednest_refresh_token');
+			if (browser) localStorage.removeItem('feednest_refresh_token');
 			set({ user: null, isAuthenticated: false, loading: false });
 		},
 
 		async checkAuth() {
+			if (!browser) {
+				set({ user: null, isAuthenticated: false, loading: false });
+				return;
+			}
 			const refreshTok = localStorage.getItem('feednest_refresh_token');
 			if (!refreshTok) {
 				set({ user: null, isAuthenticated: false, loading: false });

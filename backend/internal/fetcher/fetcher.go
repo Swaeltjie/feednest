@@ -60,6 +60,20 @@ func FetchFeed(feedURL string) (*FeedResult, error) {
 		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, feedURL)
 	}
 
+	// Validate content type to reject binary/non-feed responses early
+	ct := resp.Header.Get("Content-Type")
+	if ct != "" {
+		ctLower := strings.ToLower(ct)
+		if !strings.Contains(ctLower, "xml") &&
+			!strings.Contains(ctLower, "rss") &&
+			!strings.Contains(ctLower, "atom") &&
+			!strings.Contains(ctLower, "text/") &&
+			!strings.Contains(ctLower, "json") &&
+			!strings.Contains(ctLower, "octet-stream") {
+			return nil, fmt.Errorf("unexpected content-type %q for %s", ct, feedURL)
+		}
+	}
+
 	limitedBody := io.LimitReader(resp.Body, maxFeedResponseSize)
 	fp := gofeed.NewParser()
 	feed, err := fp.Parse(limitedBody)

@@ -38,6 +38,11 @@
 
 	onMount(async () => {
 		const id = Number(page.params.id);
+		if (!Number.isInteger(id) || id <= 0) {
+			error = 'Invalid article ID';
+			loading = false;
+			return;
+		}
 		try {
 			article = await articles.getArticle(id);
 			if (article && !article.is_read) {
@@ -293,7 +298,7 @@
 						line-height: {READER_LINE_HEIGHT_MAP[$settings.readerLineHeight]};
 						max-width: {READER_CONTENT_WIDTH_MAP[$settings.readerContentWidth]}; margin: 0 auto;"
 				>
-					{@html DOMPurify.sanitize(article.content_clean || article.content_raw)}
+					{@html DOMPurify.sanitize(article.content_clean || article.content_raw, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
 				</div>
 			{:else}
 				<div

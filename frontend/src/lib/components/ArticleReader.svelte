@@ -375,7 +375,7 @@
 							line-height: {READER_LINE_HEIGHT_MAP[$settings.readerLineHeight]};
 							max-width: {READER_CONTENT_WIDTH_MAP[$settings.readerContentWidth]}; margin: 0 auto;"
 					>
-						{@html DOMPurify.sanitize(article.content_clean || article.content_raw)}
+						{@html DOMPurify.sanitize(article.content_clean || article.content_raw, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
 					</div>
 				{:else}
 					<div class="flex flex-col items-center justify-center py-16 text-center">

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/mail"
 	"regexp"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -90,6 +91,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalize username and email to lowercase to prevent case-based duplicates
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
 	if utf8.RuneCountInString(req.Username) > 64 || !usernameRe.MatchString(req.Username) {
 		http.Error(w, `{"error":"username must be 1-64 chars, alphanumeric/underscore/dash/dot only"}`, http.StatusBadRequest)
 		return
@@ -155,6 +160,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
 	}
+
+	// Normalize username to match registration
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
 
 	user, err := h.store.GetUserByUsername(req.Username)
 	if err != nil {

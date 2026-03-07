@@ -3,7 +3,6 @@
 	import { timeAgo } from '$lib/utils/time';
 	import { getFaviconUrl } from '$lib/utils/favicon';
 	import { api } from '$lib/api/client';
-	import { onMount } from 'svelte';
 	import DOMPurify from 'isomorphic-dompurify';
 	import { blurUp } from '$lib/utils/blurload';
 
@@ -12,11 +11,17 @@
 		onClose = () => {},
 		articleIds = [],
 		onNavigate,
+		inline = false,
+		focusMode = false,
+		onToggleFocus,
 	}: {
 		articleId: number;
 		onClose?: () => void;
 		articleIds?: number[];
 		onNavigate?: (id: number) => void;
+		inline?: boolean;
+		focusMode?: boolean;
+		onToggleFocus?: () => void;
 	} = $props();
 
 	let article: Article | null = $state(null);
@@ -24,7 +29,6 @@
 	let error = $state('');
 	let startTime = Date.now();
 	let starAnimating = $state(false);
-	let visible = $state(false);
 
 	// Task 8: Reading progress
 	let readingProgress = $state(0);
@@ -37,11 +41,6 @@
 	// Task 10: Article navigation
 	let contentEl: HTMLElement;
 	let slideDirection = $state<'left' | 'right' | null>(null);
-
-	onMount(() => {
-		// Trigger slide-in animation
-		requestAnimationFrame(() => { visible = true; });
-	});
 
 	// Reactive article fetching - runs on mount and when articleId changes
 	$effect(() => {
@@ -117,8 +116,7 @@
 
 	function handleClose() {
 		trackReadTime();
-		visible = false;
-		setTimeout(onClose, 300);
+		onClose();
 	}
 
 	function formatDate(dateStr: string | null): string {
@@ -134,7 +132,13 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
-			handleClose();
+			if (focusMode) {
+				onToggleFocus?.();
+			} else {
+				handleClose();
+			}
+		} else if (e.key === 'f') {
+			onToggleFocus?.();
 		} else if ((e.key === 'j' || e.key === 'k') && articleIds.length > 0) {
 			const currentIdx = articleIds.indexOf(articleId);
 			if (currentIdx === -1) return;
@@ -150,23 +154,13 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<!-- Backdrop -->
-<div
-	class="fixed inset-0 z-40 transition-opacity duration-300 {visible ? 'bg-black/40 backdrop-blur-sm' : 'bg-transparent pointer-events-none'}"
-	role="button"
-	tabindex="-1"
-	onclick={handleClose}
-	onkeydown={(e) => e.key === 'Enter' && handleClose()}
-></div>
-
 <!-- Reader panel -->
 <div
-	class="fixed inset-y-0 right-0 z-50 w-full max-w-2xl flex flex-col transition-transform duration-300 ease-out
-		{visible ? 'translate-x-0' : 'translate-x-full'}"
+	class="flex flex-col h-full"
 	style="background: var(--color-surface);"
 >
 	<!-- Task 8: Reading progress bar -->
-	{#if visible && !loading && article}
+	{#if !loading && article}
 		<div
 			class="absolute top-0 left-0 z-10 h-0.5 reading-progress"
 			style="width: {readingProgress}%; transition: width 100ms linear;"
@@ -212,12 +206,12 @@
 					class="flex items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors group min-w-0"
 				>
 					<svg class="w-5 h-5 flex-shrink-0 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
 					</svg>
 					{#if readerHeaderCompact}
 						<span class="truncate max-w-[200px] text-[var(--color-text-primary)] font-medium">{article.title}</span>
 					{:else}
-						Close
+						Back
 					{/if}
 				</button>
 
@@ -248,6 +242,20 @@
 						</svg>
 						<span class="hidden sm:inline">Original</span>
 					</a>
+
+					<button
+						onclick={() => onToggleFocus?.()}
+						class="p-2 rounded-lg transition-all text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] hover:bg-[var(--color-elevated)]"
+						title={focusMode ? 'Exit focus mode (f)' : 'Focus mode (f)'}
+					>
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							{#if focusMode}
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+							{:else}
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+							{/if}
+						</svg>
+					</button>
 				</div>
 			</div>
 		</header>

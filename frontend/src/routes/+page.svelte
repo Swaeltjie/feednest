@@ -48,6 +48,7 @@
 	let keyboardHintsOpen = $state(false);
 	let scrollY = $state(0);
 	let headerCompact = $derived(scrollY > 80);
+	let focusMode = $state(false);
 
 	const FEATURED_COUNT = 3;
 
@@ -87,32 +88,17 @@
 	}
 
 	function openArticle(id: number) {
-		const doOpen = () => {
-			openArticleId = id;
-			const a = $articles.articles.find((a) => a.id === id);
-			if (a && !a.is_read) {
-				articles.toggleRead(id, true);
-			}
-		};
-
-		if ((document as any).startViewTransition) {
-			(document as any).startViewTransition(doOpen);
-		} else {
-			doOpen();
+		openArticleId = id;
+		const a = $articles.articles.find((a) => a.id === id);
+		if (a && !a.is_read) {
+			articles.toggleRead(id, true);
 		}
 	}
 
 	function closeArticle() {
-		const doClose = () => {
-			openArticleId = null;
-			articles.load(currentFilters);
-		};
-
-		if ((document as any).startViewTransition) {
-			(document as any).startViewTransition(doClose);
-		} else {
-			doClose();
-		}
+		openArticleId = null;
+		focusMode = false;
+		articles.load(currentFilters);
 	}
 
 	function selectAll() {
@@ -225,6 +211,11 @@
 			escape: (e) => {
 				if (openArticleId) {
 					closeArticle();
+				}
+			},
+			f: (e) => {
+				if (openArticleId) {
+					focusMode = !focusMode;
 				}
 			},
 			s: (e) => {
@@ -519,105 +510,125 @@
 			</div>
 		</header>
 
-		<!-- Article content -->
-		<main class="flex-1 overflow-y-auto">
-			{#if $articles.loading && !initialized}
-				<SkeletonLoader mode={viewMode} />
-			{:else if $articles.articles.length === 0}
-				<!-- Empty state -->
-				<div class="flex flex-col items-center justify-center py-20 text-center px-4 fade-in-up">
-					<div class="animate-float mb-6">
-						<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
-							<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-							</svg>
+		<!-- Content area: list + optional reading pane -->
+		<div class="flex-1 flex overflow-hidden">
+			<!-- Article list pane -->
+			<div
+				class="overflow-y-auto transition-all duration-300
+					{openArticleId
+						? focusMode
+							? 'w-0 min-w-0 opacity-0 overflow-hidden'
+							: 'hidden lg:block lg:w-[350px] lg:min-w-[350px] lg:border-r lg:border-[var(--color-border)]'
+						: 'w-full'}"
+			>
+				{#if $articles.loading && !initialized}
+					<SkeletonLoader mode={viewMode} />
+				{:else if $articles.articles.length === 0}
+					<!-- Empty state -->
+					<div class="flex flex-col items-center justify-center py-20 text-center px-4 fade-in-up">
+						<div class="animate-float mb-6">
+							<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
+								<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+								</svg>
+							</div>
 						</div>
-					</div>
-					<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No articles found</h2>
-					<p class="text-sm text-[var(--color-text-secondary)] mb-4">
+						<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No articles found</h2>
+						<p class="text-sm text-[var(--color-text-secondary)] mb-4">
+							{#if $feeds.length === 0}
+								Add a feed to get started.
+							{:else}
+								Try changing your filters or check back later.
+							{/if}
+						</p>
 						{#if $feeds.length === 0}
-							Add a feed to get started.
-						{:else}
-							Try changing your filters or check back later.
+							<button
+								onclick={openAddFeed}
+								class="px-5 py-2.5 text-sm font-medium text-white rounded-xl accent-gradient hover:opacity-90 transition-opacity shadow-lg shadow-blue-500/25"
+							>
+								Add Your First Feed
+							</button>
 						{/if}
-					</p>
-					{#if $feeds.length === 0}
-						<button
-							onclick={openAddFeed}
-							class="px-5 py-2.5 text-sm font-medium text-white rounded-xl accent-gradient hover:opacity-90 transition-opacity shadow-lg shadow-blue-500/25"
-						>
-							Add Your First Feed
-						</button>
-					{/if}
-				</div>
-			{:else}
-				<!-- Hybrid view: featured heroes + dense list -->
-				{#if viewMode === 'hybrid'}
-					{#if featuredArticles.length > 0}
-						<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
-							{#each featuredArticles as article, i (article.id)}
-								<div data-article-index={$articles.articles.indexOf(article)}>
-									<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
+					</div>
+				{:else}
+					<!-- When article is open, always show compact list view -->
+					{#if openArticleId}
+						<div style="background: var(--color-card);">
+							{#each $articles.articles as article, i (article.id)}
+								<div data-article-index={i}>
+									<ArticleList {article} selected={article.id === openArticleId} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
 								</div>
 							{/each}
 						</div>
+					{:else}
+						<!-- Normal view modes when no article open -->
+						{#if viewMode === 'hybrid'}
+							{#if featuredArticles.length > 0}
+								<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+									{#each featuredArticles as article, i (article.id)}
+										<div data-article-index={$articles.articles.indexOf(article)}>
+											<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
+										</div>
+									{/each}
+								</div>
+							{/if}
+							<div style="background: var(--color-card);" class="rounded-t-2xl mx-2 mt-2">
+								{#each listArticles as article, i (article.id)}
+									<div data-article-index={$articles.articles.indexOf(article)}>
+										<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
+									</div>
+								{/each}
+							</div>
+						{:else if viewMode === 'cards'}
+							<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+								{#each $articles.articles as article, i (article.id)}
+									<div data-article-index={i}>
+										<ArticleCard {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<div style="background: var(--color-card);" class="m-2 rounded-2xl overflow-hidden">
+								{#each $articles.articles as article, i (article.id)}
+									<div data-article-index={i}>
+										<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
+									</div>
+								{/each}
+							</div>
+						{/if}
+
+						{#if $articles.loading && initialized}
+							<div class="flex items-center justify-center py-4">
+								<div class="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin"></div>
+							</div>
+						{/if}
+
+						{#if $articles.articles.length > 0}
+							<div class="text-center py-4 text-sm text-[var(--color-text-tertiary)]">
+								Showing {$articles.articles.length} of {$articles.total} articles
+							</div>
+						{/if}
 					{/if}
-					<div style="background: var(--color-card);" class="rounded-t-2xl mx-2 mt-2">
-						{#each listArticles as article, i (article.id)}
-							<div data-article-index={$articles.articles.indexOf(article)}>
-								<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
-							</div>
-						{/each}
-					</div>
-
-				<!-- All cards view -->
-				{:else if viewMode === 'cards'}
-					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
-						{#each $articles.articles as article, i (article.id)}
-							<div data-article-index={i}>
-								<ArticleCard {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
-							</div>
-						{/each}
-					</div>
-
-				<!-- All list view -->
-				{:else}
-					<div style="background: var(--color-card);" class="m-2 rounded-2xl overflow-hidden">
-						{#each $articles.articles as article, i (article.id)}
-							<div data-article-index={i}>
-								<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
-							</div>
-						{/each}
-					</div>
 				{/if}
+			</div>
 
-				<!-- Loading indicator for filter changes -->
-				{#if $articles.loading && initialized}
-					<div class="flex items-center justify-center py-4">
-						<div class="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin"></div>
-					</div>
-				{/if}
-
-				<!-- Article count footer -->
-				{#if $articles.articles.length > 0}
-					<div class="text-center py-4 text-sm text-[var(--color-text-tertiary)]">
-						Showing {$articles.articles.length} of {$articles.total} articles
-					</div>
-				{/if}
+			<!-- Reading pane (inline, not overlay) -->
+			{#if openArticleId}
+				<div class="flex-1 min-w-0" style="background: var(--color-surface);">
+					<ArticleReader
+						articleId={openArticleId}
+						onClose={closeArticle}
+						articleIds={$articles.articles.map(a => a.id)}
+						onNavigate={(id) => { openArticleId = id; }}
+						inline={true}
+						{focusMode}
+						onToggleFocus={() => { focusMode = !focusMode; }}
+					/>
+				</div>
 			{/if}
-		</main>
+		</div>
 	</div>
 </div>
-
-<!-- Article Reader Panel (Feedly-style slide-in) -->
-{#if openArticleId}
-	<ArticleReader
-		articleId={openArticleId}
-		onClose={closeArticle}
-		articleIds={$articles.articles.map(a => a.id)}
-		onNavigate={(id) => { openArticleId = id; }}
-	/>
-{/if}
 
 <!-- Command Palette -->
 <CommandPalette

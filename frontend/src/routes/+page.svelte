@@ -7,6 +7,7 @@
 	import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
+	import KeyboardHints from '$lib/components/KeyboardHints.svelte';
 	import { articles, type ArticleFilters } from '$lib/stores/articles';
 	import { feeds, categories } from '$lib/stores/feeds';
 	import { api } from '$lib/api/client';
@@ -44,6 +45,7 @@
 	let refreshInterval: ReturnType<typeof setInterval> | undefined;
 	let countdownInterval: ReturnType<typeof setInterval> | undefined;
 	let commandPaletteOpen = $state(false);
+	let keyboardHintsOpen = $state(false);
 	let scrollY = $state(0);
 	let headerCompact = $derived(scrollY > 80);
 
@@ -251,7 +253,7 @@
 				commandPaletteOpen = !commandPaletteOpen;
 			},
 			'?': (e) => {
-				// Will be wired to keyboard hints in Task 7
+				keyboardHintsOpen = !keyboardHintsOpen;
 			},
 			gg: (e) => {
 				selectedIndex = 0;
@@ -605,6 +607,9 @@
 	onSelectStarred={selectStarred}
 	onRefresh={async () => { refreshCountdown = 300; await feeds.load(); await articles.load(currentFilters); }}
 />
+
+<!-- Keyboard Hints -->
+<KeyboardHints bind:open={keyboardHintsOpen} />
 
 <!-- Add Feed Modal -->
 {#if showAddFeedModal}

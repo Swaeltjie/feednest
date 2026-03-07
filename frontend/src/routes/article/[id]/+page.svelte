@@ -7,6 +7,14 @@
 	import { onMount } from 'svelte';
 	import DOMPurify from 'isomorphic-dompurify';
 	import { isSafeUrl } from '$lib/api/client';
+	import ReaderSettings from '$lib/components/ReaderSettings.svelte';
+	import {
+		settings,
+		READER_FONT_SIZE_MAP,
+		READER_FONT_FAMILY_MAP,
+		READER_LINE_HEIGHT_MAP,
+		READER_CONTENT_WIDTH_MAP,
+	} from '$lib/stores/settings';
 
 	DOMPurify.addHook('afterSanitizeAttributes', (node: Element) => {
 		if (node.tagName === 'A') {
@@ -26,6 +34,7 @@
 	let error = $state('');
 	let startTime = $state(Date.now());
 	let starAnimating = $state(false);
+	let readerSettingsOpen = $state(false);
 
 	onMount(async () => {
 		const id = Number(page.params.id);
@@ -155,6 +164,17 @@
 				</button>
 
 				<div class="flex items-center gap-2">
+					<div class="relative">
+						<button
+							onclick={(e) => { e.stopPropagation(); readerSettingsOpen = !readerSettingsOpen; }}
+							class="p-2 rounded-lg transition-all text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] hover:bg-[var(--color-elevated)]"
+							title="Reader settings"
+						>
+							<span class="text-sm font-bold">Aa</span>
+						</button>
+						<ReaderSettings bind:open={readerSettingsOpen} />
+					</div>
+
 					<!-- Star button -->
 					<button
 						onclick={handleStar}
@@ -200,7 +220,7 @@
 		</header>
 
 		<!-- Article content -->
-		<article class="max-w-[680px] mx-auto px-4 sm:px-6 py-8 sm:py-12 fade-in-up">
+		<article class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 fade-in-up">
 			<!-- Title -->
 			<h1
 				class="text-3xl md:text-4xl font-bold text-[var(--color-text-primary)] leading-tight"
@@ -268,7 +288,10 @@
 						prose-blockquote:border-l-[var(--color-accent)] prose-blockquote:bg-[var(--color-accent-glow)] prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg
 						prose-p:text-[var(--color-text-primary)] prose-li:text-[var(--color-text-primary)]
 						max-w-none"
-					style="line-height: 1.75; font-size: 18px;"
+					style="font-size: {READER_FONT_SIZE_MAP[$settings.readerFontSize]};
+						font-family: {READER_FONT_FAMILY_MAP[$settings.readerFontFamily]};
+						line-height: {READER_LINE_HEIGHT_MAP[$settings.readerLineHeight]};
+						max-width: {READER_CONTENT_WIDTH_MAP[$settings.readerContentWidth]}; margin: 0 auto;"
 				>
 					{@html DOMPurify.sanitize(article.content_clean || article.content_raw)}
 				</div>

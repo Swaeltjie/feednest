@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { feeds, categories, type Feed, type Category } from '$lib/stores/feeds';
 	import { auth } from '$lib/stores/auth';
+	import { getFaviconUrl } from '$lib/utils/favicon';
 
 	let {
 		collapsed = false,
@@ -23,6 +24,9 @@
 		onSelectCategory?: (id: number) => void;
 		onAddFeed?: () => void;
 	} = $props();
+
+	let contextMenu = $state<{ feed: Feed; x: number; y: number } | null>(null);
+	let deletingFeedId = $state<number | null>(null);
 
 	function groupByCategory(feedList: Feed[], catList: Category[]) {
 		const uncategorized: Feed[] = [];
@@ -49,7 +53,32 @@
 	}
 
 	let allUnread = $derived(totalUnread($feeds));
+
+	function handleContextMenu(e: MouseEvent, feed: Feed) {
+		e.preventDefault();
+		contextMenu = { feed, x: e.clientX, y: e.clientY };
+	}
+
+	function closeContextMenu() {
+		contextMenu = null;
+	}
+
+	async function handleDeleteFeed(feed: Feed) {
+		contextMenu = null;
+		deletingFeedId = feed.id;
+		try {
+			await feeds.remove(feed.id);
+		} finally {
+			deletingFeedId = null;
+		}
+	}
+
+	function feedIcon(feed: Feed): string | null {
+		return getFaviconUrl(feed.icon_url, feed.site_url, feed.url);
+	}
 </script>
+
+<svelte:window onclick={closeContextMenu} />
 
 <aside
 	class="flex flex-col h-full border-r border-[var(--color-border)] transition-all duration-300 ease-in-out overflow-hidden"
@@ -57,15 +86,20 @@
 >
 	<!-- Logo -->
 	<div class="flex items-center gap-2 px-4 py-4 border-b border-[var(--color-border)]">
+		<div class="w-7 h-7 rounded-lg accent-gradient flex items-center justify-center flex-shrink-0">
+			<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 110-2 1 1 0 010 2z" />
+			</svg>
+		</div>
 		<h1 class="text-lg font-bold accent-gradient-text whitespace-nowrap tracking-tight">FeedNest</h1>
 	</div>
 
 	<!-- Navigation -->
-	<nav class="flex-1 overflow-y-auto py-2">
+	<nav class="flex-1 overflow-y-auto py-2 px-1.5">
 		<!-- All Articles -->
 		<button
 			onclick={onSelectAll}
-			class="flex items-center justify-between w-full px-4 py-2.5 text-sm text-left transition-all rounded-lg mx-1 mr-2
+			class="flex items-center justify-between w-full px-3 py-2.5 text-sm text-left transition-all rounded-xl
 				{activeView === 'all'
 					? 'glow-active text-[var(--color-accent)]'
 					: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
@@ -77,7 +111,7 @@
 				All Articles
 			</span>
 			{#if allUnread > 0}
-				<span class="px-2 py-0.5 text-xs font-semibold rounded-full accent-gradient text-white">
+				<span class="px-2 py-0.5 text-xs font-semibold rounded-full accent-gradient text-white min-w-[1.25rem] text-center">
 					{allUnread}
 				</span>
 			{/if}
@@ -86,7 +120,7 @@
 		<!-- Starred -->
 		<button
 			onclick={onSelectStarred}
-			class="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-left transition-all rounded-lg mx-1 mr-2
+			class="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-left transition-all rounded-xl
 				{activeView === 'starred'
 					? 'glow-active text-[var(--color-accent)]'
 					: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
@@ -97,7 +131,7 @@
 			Starred
 		</button>
 
-		<div class="my-2 mx-4 border-t border-[var(--color-border)]"></div>
+		<div class="my-2.5 mx-2 border-t border-[var(--color-border)]"></div>
 
 		<!-- Categorized feeds -->
 		{#each feedsByCategory.grouped as { category, feeds: catFeeds }}
@@ -105,7 +139,7 @@
 			<div class="mt-1">
 				<button
 					onclick={() => onSelectCategory(category.id)}
-					class="flex items-center justify-between w-full px-4 py-1.5 text-left transition-colors
+					class="flex items-center justify-between w-full px-3 py-1.5 text-left transition-colors rounded-lg
 						{activeView === 'category' && activeCategory === category.id
 							? 'text-[var(--color-accent)]'
 							: 'hover:text-[var(--color-text-primary)]'}"
@@ -122,14 +156,16 @@
 				{#each catFeeds as feed}
 					<button
 						onclick={() => onSelectFeed(feed.id)}
-						class="flex items-center justify-between w-full pl-5 pr-4 py-1.5 text-sm text-left transition-all rounded-r-lg
+						oncontextmenu={(e) => handleContextMenu(e, feed)}
+						class="flex items-center justify-between w-full pl-4 pr-3 py-1.5 text-sm text-left transition-all rounded-lg
+							{deletingFeedId === feed.id ? 'opacity-40' : ''}
 							{activeView === 'feed' && activeFeed === feed.id
 								? 'glow-active text-[var(--color-accent)]'
 								: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
 					>
 						<span class="flex items-center gap-2 truncate">
-							{#if feed.icon_url}
-								<img src={feed.icon_url} alt="" class="w-4 h-4 rounded-full flex-shrink-0" />
+							{#if feedIcon(feed)}
+								<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" />
 							{:else}
 								<span class="w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold">
 									{feed.title?.charAt(0)?.toUpperCase() || '?'}
@@ -150,20 +186,22 @@
 		<!-- Uncategorized feeds -->
 		{#if feedsByCategory.uncategorized.length > 0}
 			<div class="mt-1">
-				<span class="block px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">
+				<span class="block px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">
 					Feeds
 				</span>
 				{#each feedsByCategory.uncategorized as feed}
 					<button
 						onclick={() => onSelectFeed(feed.id)}
-						class="flex items-center justify-between w-full pl-5 pr-4 py-1.5 text-sm text-left transition-all rounded-r-lg
+						oncontextmenu={(e) => handleContextMenu(e, feed)}
+						class="flex items-center justify-between w-full pl-4 pr-3 py-1.5 text-sm text-left transition-all rounded-lg
+							{deletingFeedId === feed.id ? 'opacity-40' : ''}
 							{activeView === 'feed' && activeFeed === feed.id
 								? 'glow-active text-[var(--color-accent)]'
 								: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
 					>
 						<span class="flex items-center gap-2 truncate">
-							{#if feed.icon_url}
-								<img src={feed.icon_url} alt="" class="w-4 h-4 rounded-full flex-shrink-0" />
+							{#if feedIcon(feed)}
+								<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" />
 							{:else}
 								<span class="w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold">
 									{feed.title?.charAt(0)?.toUpperCase() || '?'}
@@ -204,3 +242,21 @@
 		</button>
 	</div>
 </aside>
+
+<!-- Context menu -->
+{#if contextMenu}
+	<div
+		class="fixed z-[100] py-1.5 rounded-xl shadow-2xl min-w-[160px] glass border border-[var(--color-border-hover)] fade-in-up"
+		style="left: {contextMenu.x}px; top: {contextMenu.y}px; animation-duration: 100ms;"
+	>
+		<button
+			onclick={() => contextMenu && handleDeleteFeed(contextMenu.feed)}
+			class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+			</svg>
+			Remove Feed
+		</button>
+	</div>
+{/if}

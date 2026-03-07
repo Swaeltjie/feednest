@@ -2,14 +2,21 @@
 	import type { Article } from '$lib/stores/articles';
 	import { articles } from '$lib/stores/articles';
 	import { timeAgo } from '$lib/utils/time';
+	import { getFaviconUrl } from '$lib/utils/favicon';
 
 	let {
 		article,
 		selected = false,
 		index = 0,
-	}: { article: Article; selected?: boolean; index?: number } = $props();
+		onOpen = (_id: number) => {},
+	}: { article: Article; selected?: boolean; index?: number; onOpen?: (id: number) => void } = $props();
 
 	let starAnimating = $state(false);
+
+	function handleClick(e: Event) {
+		e.preventDefault();
+		onOpen(article.id);
+	}
 
 	function handleStar(e: Event) {
 		e.preventDefault();
@@ -18,10 +25,13 @@
 		starAnimating = true;
 		setTimeout(() => (starAnimating = false), 200);
 	}
+
+	let feedIcon = $derived(getFaviconUrl(article.feed_icon_url, undefined, undefined));
 </script>
 
 <a
 	href="/article/{article.id}"
+	onclick={handleClick}
 	class="group flex items-start gap-4 px-4 py-3.5 transition-all duration-200 fade-in-up
 		border-b border-[var(--color-border)]
 		hover:bg-[var(--color-elevated)] hover:shadow-md
@@ -61,8 +71,8 @@
 		{/if}
 
 		<div class="flex items-center gap-2 mt-1.5 text-xs text-[var(--color-text-tertiary)]">
-			{#if article.feed_icon_url}
-				<img src={article.feed_icon_url} alt="" class="w-3.5 h-3.5 rounded-full" />
+			{#if feedIcon}
+				<img src={feedIcon} alt="" class="w-3.5 h-3.5 rounded-full" />
 			{/if}
 			<span class="font-medium text-[var(--color-text-secondary)]">{article.feed_title}</span>
 			<span class="opacity-40">·</span>
@@ -77,6 +87,7 @@
 	<!-- Star -->
 	<button
 		onclick={handleStar}
+		aria-label={article.is_starred ? 'Unstar' : 'Star'}
 		class="flex-shrink-0 p-1.5 rounded-lg transition-all
 			{article.is_starred
 				? 'text-yellow-500 hover:text-yellow-400'

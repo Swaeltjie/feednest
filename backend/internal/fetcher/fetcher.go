@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -57,6 +58,15 @@ func FetchFeed(url string) (*FeedResult, error) {
 		result.IconURL = feed.Image.URL
 	}
 
+	// If no icon from feed, try to derive favicon from site URL
+	if result.IconURL == "" && result.SiteURL != "" {
+		result.IconURL = deriveFaviconURL(result.SiteURL)
+	}
+	if result.IconURL == "" {
+		// Try deriving from feed URL itself
+		result.IconURL = deriveFaviconURL(url)
+	}
+
 	for _, item := range feed.Items {
 		fi := FeedItem{
 			GUID:  item.GUID,
@@ -103,6 +113,14 @@ func FetchFeed(url string) (*FeedResult, error) {
 	}
 
 	return result, nil
+}
+
+func deriveFaviconURL(siteURL string) string {
+	u, err := url.Parse(siteURL)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s&sz=32", u.Host)
 }
 
 func countWords(s string) int {

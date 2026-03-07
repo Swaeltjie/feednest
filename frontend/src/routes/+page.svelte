@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { goto } from '$app/navigation';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import ArticleCard from '$lib/components/ArticleCard.svelte';
 	import ArticleList from '$lib/components/ArticleList.svelte';
+	import ArticleReader from '$lib/components/ArticleReader.svelte';
 	import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { articles, type ArticleFilters } from '$lib/stores/articles';
@@ -34,6 +34,10 @@
 	let initialized = $state(false);
 	let selectedIndex = $state(-1);
 	let cleanupKeyboard: (() => void) | undefined;
+	let openArticleId = $state<number | null>(null);
+	let refreshCountdown = $state(60);
+	let refreshInterval: ReturnType<typeof setInterval> | undefined;
+	let countdownInterval: ReturnType<typeof setInterval> | undefined;
 
 	const FEATURED_COUNT = 3;
 
@@ -69,6 +73,21 @@
 		if (typeof localStorage !== 'undefined') {
 			localStorage.setItem('feednest_view', mode);
 		}
+	}
+
+	function openArticle(id: number) {
+		openArticleId = id;
+		// Mark as read immediately in the list
+		const a = $articles.articles.find((a) => a.id === id);
+		if (a && !a.is_read) {
+			articles.toggleRead(id, true);
+		}
+	}
+
+	function closeArticle() {
+		openArticleId = null;
+		// Reload to refresh read states
+		articles.load(currentFilters);
 	}
 
 	function selectAll() {
@@ -134,6 +153,17 @@
 			initialized = true;
 		}
 
+		// Auto-refresh every 60 seconds
+		refreshCountdown = 60;
+		countdownInterval = setInterval(() => {
+			refreshCountdown = Math.max(0, refreshCountdown - 1);
+		}, 1000);
+		refreshInterval = setInterval(async () => {
+			refreshCountdown = 60;
+			await feeds.load();
+			await articles.load(currentFilters);
+		}, 60000);
+
 		cleanupKeyboard = setupKeyboardShortcuts({
 			j: () => {
 				const articleList = $articles.articles;
@@ -149,7 +179,12 @@
 			enter: () => {
 				const articleList = $articles.articles;
 				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
-					goto(`/article/${articleList[selectedIndex].id}`);
+					openArticle(articleList[selectedIndex].id);
+				}
+			},
+			escape: () => {
+				if (openArticleId) {
+					closeArticle();
 				}
 			},
 			s: () => {
@@ -193,6 +228,8 @@
 
 	onDestroy(() => {
 		cleanupKeyboard?.();
+		clearInterval(refreshInterval);
+		clearInterval(countdownInterval);
 	});
 
 	$effect(() => {
@@ -304,6 +341,29 @@
 				</div>
 
 				<div class="flex items-center gap-3">
+					<!-- Refresh countdown -->
+					<button
+						onclick={async () => { refreshCountdown = 60; await feeds.load(); await articles.load(currentFilters); }}
+						class="group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all
+							hover:bg-[var(--color-elevated)] text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)]"
+						title="Click to refresh now"
+					>
+						<svg class="w-3.5 h-3.5 transition-transform group-hover:rotate-180 duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+						</svg>
+						<span class="tabular-nums w-4 text-center">{refreshCountdown}</span>
+						<svg class="w-3 h-3 opacity-60" viewBox="0 0 36 36">
+							<circle cx="18" cy="18" r="15" fill="none" stroke="var(--color-border)" stroke-width="3" />
+							<circle cx="18" cy="18" r="15" fill="none" stroke="var(--color-accent)" stroke-width="3"
+								stroke-dasharray={2 * Math.PI * 15}
+								stroke-dashoffset={2 * Math.PI * 15 * (1 - refreshCountdown / 60)}
+								stroke-linecap="round"
+								transform="rotate(-90 18 18)"
+								class="transition-all duration-1000 ease-linear"
+							/>
+						</svg>
+					</button>
+
 					<!-- Sort -->
 					<select
 						bind:value={sortOption}
@@ -387,13 +447,13 @@
 					{#if featuredArticles.length > 0}
 						<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
 							{#each featuredArticles as article, i (article.id)}
-								<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} />
+								<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
 							{/each}
 						</div>
 					{/if}
 					<div style="background: var(--color-card);" class="rounded-t-2xl mx-2 mt-2">
 						{#each listArticles as article, i (article.id)}
-							<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} />
+							<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
 						{/each}
 					</div>
 
@@ -401,7 +461,7 @@
 				{:else if viewMode === 'cards'}
 					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
 						{#each $articles.articles as article, i (article.id)}
-							<ArticleCard {article} selected={i === selectedIndex} index={i} />
+							<ArticleCard {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
 						{/each}
 					</div>
 
@@ -409,7 +469,7 @@
 				{:else}
 					<div style="background: var(--color-card);" class="m-2 rounded-2xl overflow-hidden">
 						{#each $articles.articles as article, i (article.id)}
-							<ArticleList {article} selected={i === selectedIndex} index={i} />
+							<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
 						{/each}
 					</div>
 				{/if}
@@ -431,6 +491,11 @@
 		</main>
 	</div>
 </div>
+
+<!-- Article Reader Panel (Feedly-style slide-in) -->
+{#if openArticleId}
+	<ArticleReader articleId={openArticleId} onClose={closeArticle} />
+{/if}
 
 <!-- Add Feed Modal -->
 {#if showAddFeedModal}

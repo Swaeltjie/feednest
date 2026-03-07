@@ -118,12 +118,16 @@ func (s *Scheduler) fetchAll() {
 				return
 			}
 
-			if feedTitle == "" && result.Title != "" {
-				s.store.UpdateFeedMetadata(feedID, &store.FeedMetadataUpdate{
-					Title:   &result.Title,
-					SiteURL: &result.SiteURL,
-					IconURL: &result.IconURL,
-				})
+			if result.Title != "" {
+				update := &store.FeedMetadataUpdate{}
+				if feedTitle == "" {
+					update.Title = &result.Title
+					update.SiteURL = &result.SiteURL
+				}
+				if result.IconURL != "" {
+					update.IconURL = &result.IconURL
+				}
+				s.store.UpdateFeedMetadata(feedID, update)
 			}
 
 			for _, item := range result.Items {

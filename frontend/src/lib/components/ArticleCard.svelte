@@ -2,12 +2,19 @@
 	import type { Article } from '$lib/stores/articles';
 	import { articles } from '$lib/stores/articles';
 	import { timeAgo } from '$lib/utils/time';
+	import { getFaviconUrl } from '$lib/utils/favicon';
 
 	let {
 		article,
 		selected = false,
 		index = 0,
-	}: { article: Article; selected?: boolean; index?: number } = $props();
+		onOpen = (_id: number) => {},
+	}: { article: Article; selected?: boolean; index?: number; onOpen?: (id: number) => void } = $props();
+
+	function handleClick(e: Event) {
+		e.preventDefault();
+		onOpen(article.id);
+	}
 
 	function handleStar(e: Event) {
 		e.preventDefault();
@@ -21,10 +28,13 @@
 		starAnimating = true;
 		setTimeout(() => (starAnimating = false), 200);
 	}
+
+	let feedIcon = $derived(getFaviconUrl(article.feed_icon_url, undefined, undefined));
 </script>
 
 <a
 	href="/article/{article.id}"
+	onclick={handleClick}
 	class="group relative block rounded-2xl overflow-hidden glass-card fade-in-up"
 	style="animation-delay: {index * 60}ms; min-height: 280px;"
 	class:ring-2={selected}
@@ -52,8 +62,8 @@
 			class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs text-white/80 mb-3 self-start"
 			style="background: rgba(255,255,255,0.1); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);"
 		>
-			{#if article.feed_icon_url}
-				<img src={article.feed_icon_url} alt="" class="w-3.5 h-3.5 rounded-full" />
+			{#if feedIcon}
+				<img src={feedIcon} alt="" class="w-3.5 h-3.5 rounded-full" />
 			{/if}
 			<span>{article.feed_title}</span>
 			<span class="opacity-50">·</span>
@@ -65,9 +75,7 @@
 		</div>
 
 		<!-- Title -->
-		<h3
-			class="text-xl font-bold text-white leading-snug line-clamp-2 drop-shadow-lg"
-		>
+		<h3 class="text-xl font-bold text-white leading-snug line-clamp-2 drop-shadow-lg">
 			{article.title}
 		</h3>
 
@@ -81,6 +89,7 @@
 	<!-- Star button (top-right) -->
 	<button
 		onclick={handleStarWithBounce}
+		aria-label={article.is_starred ? 'Unstar' : 'Star'}
 		class="absolute top-3 right-3 p-2 rounded-full transition-all {article.is_starred
 			? 'text-yellow-400 bg-yellow-400/20'
 			: 'text-white/50 hover:text-white bg-black/20 hover:bg-black/40'} {starAnimating ? 'star-bounce' : ''}"

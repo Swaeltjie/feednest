@@ -81,6 +81,9 @@ async function doRefresh(): Promise<boolean> {
 		if (!res.ok) return false;
 		const data = await res.json();
 		accessToken = data.access_token;
+		if (data.refresh_token) {
+			localStorage.setItem('feednest_refresh_token', data.refresh_token);
+		}
 		return true;
 	} catch {
 		return false;

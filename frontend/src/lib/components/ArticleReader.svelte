@@ -60,20 +60,24 @@
 	// Reactive article fetching - runs on mount and when articleId changes
 	$effect(() => {
 		const id = articleId;
+		let cancelled = false;
 		loading = true;
 		error = '';
 		articles.getArticle(id).then((a) => {
+			if (cancelled) return;
 			article = a;
 			if (a && !a.is_read) {
 				articles.toggleRead(a.id, true);
 				a.is_read = true;
 			}
-			api.post('/api/events', { article_id: id, event_type: 'click', duration_seconds: 0 });
+			api.post('/api/events', { article_id: id, event_type: 'click', duration_seconds: 0 }).catch(() => {});
 		}).catch(() => {
+			if (cancelled) return;
 			error = 'Article not found';
 		}).finally(() => {
-			loading = false;
+			if (!cancelled) loading = false;
 		});
+		return () => { cancelled = true; };
 	});
 
 	// Reset state on article change (navigation)
@@ -86,7 +90,8 @@
 			startTime = Date.now();
 
 			if (slideDirection) {
-				setTimeout(() => { slideDirection = null; }, 300);
+				const t = setTimeout(() => { slideDirection = null; }, 300);
+				return () => clearTimeout(t);
 			}
 		}
 	});
@@ -116,7 +121,7 @@
 					article_id: article.id,
 					event_type: 'read',
 					duration_seconds: duration,
-				});
+				}).catch(() => {});
 			}
 		}
 	}
@@ -245,6 +250,7 @@
 						</svg>
 					</button>
 
+					{#if article.url && isSafeUrl(article.url)}
 					<a
 						href={article.url}
 						target="_blank"
@@ -258,6 +264,7 @@
 						</svg>
 						<span class="hidden sm:inline">Original</span>
 					</a>
+					{/if}
 
 					<button
 						onclick={() => onToggleFocus?.()}
@@ -355,6 +362,7 @@
 							</svg>
 						</div>
 						<p class="text-[var(--color-text-secondary)] mb-4">No content available for this article.</p>
+						{#if article.url && isSafeUrl(article.url)}
 						<a
 							href={article.url}
 							target="_blank"
@@ -363,6 +371,7 @@
 						>
 							Read on Original Site
 						</a>
+						{/if}
 					</div>
 				{/if}
 			</article>

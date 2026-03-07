@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 
@@ -57,8 +58,8 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 		filter.CategoryID = &id
 	}
 	if search := r.URL.Query().Get("search"); search != "" {
-		if len(search) > 200 {
-			search = search[:200]
+		if utf8.RuneCountInString(search) > 200 {
+			search = string([]rune(search)[:200])
 		}
 		filter.Search = search
 	}

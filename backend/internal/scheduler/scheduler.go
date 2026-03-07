@@ -14,6 +14,7 @@ type Scheduler struct {
 	store    *store.Queries
 	interval time.Duration
 	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 func New(store *store.Queries, interval time.Duration) *Scheduler {
@@ -44,7 +45,7 @@ func (s *Scheduler) Start() {
 }
 
 func (s *Scheduler) Stop() {
-	close(s.stop)
+	s.stopOnce.Do(func() { close(s.stop) })
 }
 
 func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {

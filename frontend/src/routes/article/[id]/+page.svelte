@@ -24,7 +24,7 @@
 	let article: Article | null = $state(null);
 	let loading = $state(true);
 	let error = $state('');
-	let startTime = Date.now();
+	let startTime = $state(Date.now());
 	let starAnimating = $state(false);
 
 	onMount(async () => {
@@ -35,7 +35,7 @@
 				await articles.toggleRead(article.id, true);
 				article.is_read = true;
 			}
-			api.post('/api/events', { article_id: id, event_type: 'click', duration_seconds: 0 });
+			api.post('/api/events', { article_id: id, event_type: 'click', duration_seconds: 0 }).catch(() => {});
 		} catch (e) {
 			error = 'Article not found';
 		} finally {
@@ -175,6 +175,7 @@
 					</button>
 
 					<!-- Open original -->
+					{#if article.url && isSafeUrl(article.url)}
 					<a
 						href={article.url}
 						target="_blank"
@@ -193,6 +194,7 @@
 						</svg>
 						<span class="hidden sm:inline">Original</span>
 					</a>
+					{/if}
 				</div>
 			</div>
 		</header>
@@ -290,6 +292,7 @@
 						</svg>
 					</div>
 					<p class="text-[var(--color-text-secondary)] mb-4">No content available for this article.</p>
+					{#if article.url && isSafeUrl(article.url)}
 					<a
 						href={article.url}
 						target="_blank"
@@ -298,6 +301,7 @@
 					>
 						Read on Original Site
 					</a>
+					{/if}
 				</div>
 			{/if}
 
@@ -320,6 +324,7 @@
 					Back to Feed
 				</button>
 
+				{#if article.url && isSafeUrl(article.url)}
 				<a
 					href={article.url}
 					target="_blank"
@@ -336,6 +341,7 @@
 						/>
 					</svg>
 				</a>
+				{/if}
 			</div>
 		</article>
 	</div>

@@ -7,9 +7,15 @@ import (
 	"strings"
 )
 
+// AllowPrivate can be set to true in tests to skip the private IP check.
+var AllowPrivate bool
+
 // IsSafeURL validates that a URL points to a public internet host,
 // blocking SSRF attempts against internal/private networks.
 func IsSafeURL(rawURL string) error {
+	if AllowPrivate {
+		return nil
+	}
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return fmt.Errorf("invalid URL: %w", err)

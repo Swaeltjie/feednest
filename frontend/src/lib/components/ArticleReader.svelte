@@ -39,7 +39,7 @@
 	let readerHeaderCompact = $state(false);
 
 	// Task 10: Article navigation
-	let contentEl: HTMLElement;
+	let contentEl: HTMLElement | undefined = $state();
 	let slideDirection = $state<'left' | 'right' | null>(null);
 
 	// Reactive article fetching - runs on mount and when articleId changes

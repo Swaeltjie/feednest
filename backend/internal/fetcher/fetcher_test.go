@@ -4,9 +4,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/feednest/backend/internal/urlutil"
 )
 
 func TestFetchFeed(t *testing.T) {
+	urlutil.AllowPrivate = true
+	t.Cleanup(func() { urlutil.AllowPrivate = false })
 	rssXML := `<?xml version="1.0"?>
 <rss version="2.0">
   <channel>

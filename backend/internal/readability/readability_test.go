@@ -4,9 +4,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/feednest/backend/internal/urlutil"
 )
 
 func TestExtractContent(t *testing.T) {
+	urlutil.AllowPrivate = true
+	t.Cleanup(func() { urlutil.AllowPrivate = false })
 	html := `<html><head><title>Test</title></head><body>
 		<nav>Navigation links here</nav>
 		<article>

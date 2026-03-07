@@ -428,6 +428,7 @@
 						{#if searchQuery}
 							<button
 								onclick={() => (searchQuery = '')}
+								aria-label="Clear search"
 								class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
 							>
 								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

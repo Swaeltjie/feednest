@@ -247,6 +247,7 @@
 			{@const isActive = activeView === 'category' && activeCategory === category.id}
 			{@const isDragOver = dragOverCategoryId === category.id}
 			<div
+				role="group"
 				class="mt-1 rounded-lg transition-all duration-200 {isDragOver ? 'bg-[var(--color-accent)]/10 ring-1 ring-[var(--color-accent)]/30' : ''}"
 				ondragover={(e) => handleCategoryDragOver(e, category.id)}
 				ondragleave={handleDragLeave}
@@ -328,6 +329,7 @@
 		<!-- Uncategorized feeds -->
 		{#if feedsByCategory.uncategorized.length > 0 || draggedFeed}
 			<div
+				role="group"
 				class="mt-1 rounded-lg transition-all duration-200 {dragOverUncategorized ? 'bg-[var(--color-accent)]/10 ring-1 ring-[var(--color-accent)]/30' : ''}"
 				ondragover={handleUncategorizedDragOver}
 				ondragleave={handleDragLeave}

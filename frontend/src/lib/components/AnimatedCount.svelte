@@ -4,13 +4,14 @@
 	let displayValue = $state(value);
 
 	$effect(() => {
-		if (value === displayValue) return;
-		const step = value > displayValue ? 1 : -1;
-		const diff = Math.abs(value - displayValue);
+		const target = value;
+		if (target === displayValue) return;
+		const step = target > displayValue ? 1 : -1;
+		const diff = Math.abs(target - displayValue);
 		const intervalMs = Math.max(20, Math.min(80, 400 / diff));
 		const interval = setInterval(() => {
 			displayValue += step;
-			if (displayValue === value) clearInterval(interval);
+			if (displayValue === target) clearInterval(interval);
 		}, intervalMs);
 		return () => clearInterval(interval);
 	});

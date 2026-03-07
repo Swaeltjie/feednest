@@ -62,13 +62,19 @@ func TestArticleStore_MarkReadAndStar(t *testing.T) {
 	feed, _ := q.CreateFeed(userID, "https://example.com/rss", "Feed", "", "", nil)
 
 	now := time.Now()
-	q.CreateArticle(feed.ID, "guid-1", "Article", "", "", "", "", "", &now, 100, 1)
+	q.CreateArticle(feed.ID, "guid-1", "Article", "https://example.com/1", "", "", "", "", &now, 100, 1)
 
-	articles, _, _ := q.ListArticles(userID, &ArticleFilter{Limit: 30, Page: 1, Sort: "newest"})
+	articles, _, err := q.ListArticles(userID, &ArticleFilter{Limit: 30, Page: 1, Sort: "newest"})
+	if err != nil {
+		t.Fatalf("list articles failed: %v", err)
+	}
+	if len(articles) == 0 {
+		t.Fatal("expected at least 1 article")
+	}
 	articleID := articles[0].ID
 
 	isRead := true
-	err := q.UpdateArticle(articleID, userID, &isRead, nil)
+	err = q.UpdateArticle(articleID, userID, &isRead, nil)
 	if err != nil {
 		t.Fatalf("mark read failed: %v", err)
 	}

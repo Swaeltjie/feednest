@@ -35,10 +35,11 @@ func main() {
 	defer db.Close()
 
 	queries := store.New(db)
-	router := api.NewRouter(queries, jwtSecret)
 
 	sched := scheduler.New(queries, 5*time.Minute)
 	sched.Start()
+
+	router := api.NewRouter(queries, jwtSecret, sched)
 	defer sched.Stop()
 
 	log.Printf("FeedNest backend starting on :%s", port)

@@ -9,15 +9,17 @@ import (
 
 	"github.com/feednest/backend/internal/apiutil"
 	"github.com/feednest/backend/internal/models"
+	"github.com/feednest/backend/internal/scheduler"
 	"github.com/feednest/backend/internal/store"
 )
 
 type FeedHandler struct {
-	store *store.Queries
+	store     *store.Queries
+	scheduler *scheduler.Scheduler
 }
 
-func NewFeedHandler(store *store.Queries) *FeedHandler {
-	return &FeedHandler{store: store}
+func NewFeedHandler(store *store.Queries, sched *scheduler.Scheduler) *FeedHandler {
+	return &FeedHandler{store: store, scheduler: sched}
 }
 
 func (h *FeedHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +52,10 @@ func (h *FeedHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, `{"error":"failed to create feed or URL already exists"}`, http.StatusConflict)
 		return
+	}
+
+	if h.scheduler != nil {
+		h.scheduler.FetchFeedNow(feed.ID, feed.URL)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

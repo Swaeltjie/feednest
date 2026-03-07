@@ -8,10 +8,11 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/feednest/backend/internal/api/handlers"
+	"github.com/feednest/backend/internal/scheduler"
 	"github.com/feednest/backend/internal/store"
 )
 
-func NewRouter(queries *store.Queries, jwtSecret string) http.Handler {
+func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Scheduler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -48,7 +49,7 @@ func NewRouter(queries *store.Queries, jwtSecret string) http.Handler {
 		r.Put("/api/categories/{id}", categoriesH.Update)
 		r.Delete("/api/categories/{id}", categoriesH.Delete)
 
-		feedsH := handlers.NewFeedHandler(queries)
+		feedsH := handlers.NewFeedHandler(queries, sched)
 		r.Get("/api/feeds", feedsH.List)
 		r.Post("/api/feeds", feedsH.Create)
 		r.Put("/api/feeds/{id}", feedsH.Update)

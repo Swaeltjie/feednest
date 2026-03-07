@@ -100,3 +100,7 @@ func runMigrations(db *sql.DB) error {
 	_, err := db.Exec(schema)
 	return err
 }
+
+func runAlterMigrations(db *sql.DB) {
+	db.Exec("ALTER TABLE feeds ADD COLUMN last_error TEXT")
+}

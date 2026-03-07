@@ -23,5 +23,7 @@ func NewDB(dbPath string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	runAlterMigrations(db)
+
 	return db, nil
 }

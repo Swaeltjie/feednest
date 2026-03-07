@@ -132,6 +132,27 @@ func (h *FeedHandler) Update(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *FeedHandler) Retry(w http.ResponseWriter, r *http.Request) {
+	userID := apiutil.ExtractUserID(r)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
+		return
+	}
+
+	feed, err := h.store.GetFeed(id, userID)
+	if err != nil {
+		http.Error(w, `{"error":"feed not found"}`, http.StatusNotFound)
+		return
+	}
+
+	if h.scheduler != nil {
+		h.scheduler.FetchFeedNow(feed.ID, feed.URL)
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (h *FeedHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID := apiutil.ExtractUserID(r)
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)

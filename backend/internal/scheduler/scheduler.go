@@ -53,6 +53,7 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
 		result, err := fetcher.FetchFeed(feedURL)
 		if err != nil {
 			log.Printf("scheduler: immediate fetch failed for %s: %v", feedURL, err)
+			s.store.SetFeedError(feedID, err.Error())
 			return
 		}
 
@@ -90,6 +91,7 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
 			)
 		}
 
+		s.store.ClearFeedError(feedID)
 		s.store.UpdateFeedLastFetched(feedID)
 		log.Printf("scheduler: immediate fetch of %s (%d items)", feedURL, len(result.Items))
 	}()
@@ -122,6 +124,7 @@ func (s *Scheduler) fetchAll() {
 			result, err := fetcher.FetchFeed(feedURL)
 			if err != nil {
 				log.Printf("scheduler: failed to fetch %s: %v", feedURL, err)
+				s.store.SetFeedError(feedID, err.Error())
 				return
 			}
 
@@ -163,6 +166,7 @@ func (s *Scheduler) fetchAll() {
 				)
 			}
 
+			s.store.ClearFeedError(feedID)
 			s.store.UpdateFeedLastFetched(feedID)
 			log.Printf("scheduler: fetched %s (%d items)", feedURL, len(result.Items))
 		}(feed.ID, feed.URL, feed.Title)

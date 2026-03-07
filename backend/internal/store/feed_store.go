@@ -34,7 +34,7 @@ func (q *Queries) CreateFeed(userID int64, url, title, siteURL, iconURL string, 
 func (q *Queries) ListFeeds(userID int64) ([]models.Feed, error) {
 	rows, err := q.db.Query(`
 		SELECT f.id, f.user_id, f.url, f.title, f.site_url, f.icon_url,
-			f.category_id, f.fetch_interval, f.last_fetched, f.engagement_score, f.created_at,
+			f.category_id, f.fetch_interval, f.last_fetched, f.engagement_score, f.created_at, f.last_error,
 			COALESCE((SELECT COUNT(*) FROM articles a WHERE a.feed_id = f.id AND a.is_read = 0), 0) as unread_count
 		FROM feeds f WHERE f.user_id = ? ORDER BY f.title`, userID,
 	)
@@ -47,7 +47,7 @@ func (q *Queries) ListFeeds(userID int64) ([]models.Feed, error) {
 	for rows.Next() {
 		var f models.Feed
 		if err := rows.Scan(&f.ID, &f.UserID, &f.URL, &f.Title, &f.SiteURL, &f.IconURL,
-			&f.CategoryID, &f.FetchInterval, &f.LastFetched, &f.EngagementScore, &f.CreatedAt, &f.UnreadCount); err != nil {
+			&f.CategoryID, &f.FetchInterval, &f.LastFetched, &f.EngagementScore, &f.CreatedAt, &f.LastError, &f.UnreadCount); err != nil {
 			return nil, err
 		}
 		feeds = append(feeds, f)
@@ -61,10 +61,10 @@ func (q *Queries) ListFeeds(userID int64) ([]models.Feed, error) {
 func (q *Queries) GetFeed(id, userID int64) (*models.Feed, error) {
 	var f models.Feed
 	err := q.db.QueryRow(`
-		SELECT id, user_id, url, title, site_url, icon_url, category_id, fetch_interval, last_fetched, engagement_score, created_at
+		SELECT id, user_id, url, title, site_url, icon_url, category_id, fetch_interval, last_fetched, engagement_score, created_at, last_error
 		FROM feeds WHERE id = ? AND user_id = ?`, id, userID,
 	).Scan(&f.ID, &f.UserID, &f.URL, &f.Title, &f.SiteURL, &f.IconURL,
-		&f.CategoryID, &f.FetchInterval, &f.LastFetched, &f.EngagementScore, &f.CreatedAt)
+		&f.CategoryID, &f.FetchInterval, &f.LastFetched, &f.EngagementScore, &f.CreatedAt, &f.LastError)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (q *Queries) DeleteFeed(id, userID int64) error {
 
 func (q *Queries) GetFeedsDueForFetch() ([]models.Feed, error) {
 	rows, err := q.db.Query(`
-		SELECT id, user_id, url, title, site_url, icon_url, category_id, fetch_interval, last_fetched, engagement_score, created_at
+		SELECT id, user_id, url, title, site_url, icon_url, category_id, fetch_interval, last_fetched, engagement_score, created_at, last_error
 		FROM feeds
 		WHERE last_fetched IS NULL
 		   OR (strftime('%s','now') - strftime('%s', last_fetched)) >= fetch_interval
@@ -121,7 +121,7 @@ func (q *Queries) GetFeedsDueForFetch() ([]models.Feed, error) {
 	for rows.Next() {
 		var f models.Feed
 		if err := rows.Scan(&f.ID, &f.UserID, &f.URL, &f.Title, &f.SiteURL, &f.IconURL,
-			&f.CategoryID, &f.FetchInterval, &f.LastFetched, &f.EngagementScore, &f.CreatedAt); err != nil {
+			&f.CategoryID, &f.FetchInterval, &f.LastFetched, &f.EngagementScore, &f.CreatedAt, &f.LastError); err != nil {
 			return nil, err
 		}
 		feeds = append(feeds, f)
@@ -136,6 +136,16 @@ type FeedMetadataUpdate struct {
 	Title   *string
 	SiteURL *string
 	IconURL *string
+}
+
+func (q *Queries) SetFeedError(id int64, errMsg string) error {
+	_, err := q.db.Exec("UPDATE feeds SET last_error = ? WHERE id = ?", errMsg, id)
+	return err
+}
+
+func (q *Queries) ClearFeedError(id int64) error {
+	_, err := q.db.Exec("UPDATE feeds SET last_error = NULL WHERE id = ?", id)
+	return err
 }
 
 func (q *Queries) UpdateFeedMetadata(id int64, update *FeedMetadataUpdate) error {

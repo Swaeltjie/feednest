@@ -35,6 +35,9 @@
 	let addingFeed = $state(false);
 	let newCategoryName = $state('');
 	let addFeedError = $state('');
+	let discoveredFeeds = $state<{ url: string; title: string; type: string }[]>([]);
+	let selectedDiscovered = $state<Set<string>>(new Set());
+	let discovering = $state(false);
 	let searchQuery = $state('');
 	let debouncedSearch = $state('');
 	let initialized = $state(false);
@@ -155,6 +158,8 @@
 		feedCategoryId = undefined;
 		newCategoryName = '';
 		addFeedError = '';
+		discoveredFeeds = [];
+		selectedDiscovered = new Set();
 		mobileMenuOpen = false;
 	}
 
@@ -173,6 +178,53 @@
 			await articles.load(currentFilters);
 		} catch (err) {
 			addFeedError = err instanceof Error ? err.message : 'Failed to add feed';
+		} finally {
+			addingFeed = false;
+		}
+	}
+
+	async function handleDiscover() {
+		if (!feedUrl.trim()) return;
+		discovering = true;
+		addFeedError = '';
+		discoveredFeeds = [];
+		selectedDiscovered = new Set();
+		try {
+			const data = await api.post<{ feeds: { url: string; title: string; type: string }[] }>(
+				'/api/feeds/discover',
+				{ url: feedUrl.trim() }
+			);
+			if (data.feeds.length === 1) {
+				feedUrl = data.feeds[0].url;
+				await handleAddFeed();
+			} else {
+				discoveredFeeds = data.feeds;
+				selectedDiscovered = new Set(data.feeds.map((f) => f.url));
+			}
+		} catch (err) {
+			addFeedError = err instanceof Error ? err.message : 'No feeds found at this URL';
+		} finally {
+			discovering = false;
+		}
+	}
+
+	async function handleAddDiscovered() {
+		addingFeed = true;
+		addFeedError = '';
+		try {
+			for (const feedInfo of discoveredFeeds.filter((f) => selectedDiscovered.has(f.url))) {
+				const body: Record<string, unknown> = { url: feedInfo.url };
+				if (feedCategoryId) body.category_id = feedCategoryId;
+				if (newCategoryName.trim()) body.new_category = newCategoryName.trim();
+				await api.post('/api/feeds', body);
+			}
+			await feeds.load();
+			await categories.load();
+			showAddFeedModal = false;
+			discoveredFeeds = [];
+			await articles.load(currentFilters);
+		} catch (err) {
+			addFeedError = err instanceof Error ? err.message : 'Failed to add feeds';
 		} finally {
 			addingFeed = false;
 		}
@@ -754,6 +806,35 @@
 				/>
 			</div>
 
+			{#if discoveredFeeds.length > 1}
+				<div>
+					<label class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
+						Found {discoveredFeeds.length} feeds
+					</label>
+					<div class="space-y-2 max-h-40 overflow-y-auto rounded-xl border border-[var(--color-border)] p-2">
+						{#each discoveredFeeds as feed}
+							<label class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--color-elevated)] cursor-pointer text-sm">
+								<input
+									type="checkbox"
+									checked={selectedDiscovered.has(feed.url)}
+									onchange={() => {
+										const next = new Set(selectedDiscovered);
+										if (next.has(feed.url)) next.delete(feed.url);
+										else next.add(feed.url);
+										selectedDiscovered = next;
+									}}
+									class="rounded accent-[var(--color-accent)]"
+								/>
+								<span class="flex-1 truncate text-[var(--color-text-primary)]">
+									{feed.title || feed.url}
+								</span>
+								<span class="text-xs text-[var(--color-text-tertiary)] uppercase">{feed.type}</span>
+							</label>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			<div class="flex justify-end gap-3 pt-2">
 				<button
 					onclick={() => (showAddFeedModal = false)}
@@ -762,15 +843,36 @@
 				>
 					Cancel
 				</button>
-				<button
-					onclick={handleAddFeed}
-					disabled={addingFeed || !feedUrl.trim()}
-					class="px-5 py-2 text-sm font-medium text-white rounded-xl accent-gradient
-						hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity
-						shadow-lg shadow-blue-500/25"
-				>
-					{addingFeed ? 'Adding...' : 'Add Feed'}
-				</button>
+				{#if discoveredFeeds.length > 1}
+					<button
+						onclick={handleAddDiscovered}
+						disabled={addingFeed || selectedDiscovered.size === 0}
+						class="px-5 py-2 text-sm font-medium text-white rounded-xl accent-gradient
+							hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity
+							shadow-lg shadow-blue-500/25"
+					>
+						{addingFeed ? 'Adding...' : `Add ${selectedDiscovered.size} Feed${selectedDiscovered.size !== 1 ? 's' : ''}`}
+					</button>
+				{:else}
+					<button
+						onclick={handleDiscover}
+						disabled={discovering || !feedUrl.trim()}
+						class="px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)]
+							border border-[var(--color-border)] rounded-xl
+							hover:bg-[var(--color-elevated)] disabled:opacity-50 transition-colors"
+					>
+						{discovering ? 'Finding...' : 'Discover'}
+					</button>
+					<button
+						onclick={handleAddFeed}
+						disabled={addingFeed || !feedUrl.trim()}
+						class="px-5 py-2 text-sm font-medium text-white rounded-xl accent-gradient
+							hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity
+							shadow-lg shadow-blue-500/25"
+					>
+						{addingFeed ? 'Adding...' : 'Add Feed'}
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>

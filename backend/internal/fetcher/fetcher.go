@@ -31,22 +31,31 @@ type FeedItem struct {
 	ReadingTime  int
 }
 
-func FetchFeed(url string) (*FeedResult, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
+const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+func FetchFeed(feedURL string) (*FeedResult, error) {
+	req, err := http.NewRequest("GET", feedURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch %s: %w", url, err)
+		return nil, fmt.Errorf("failed to create request for %s: %w", feedURL, err)
+	}
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/rss+xml, application/atom+xml, application/xml, text/xml, */*")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s: %w", feedURL, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, url)
+		return nil, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, feedURL)
 	}
 
 	fp := gofeed.NewParser()
 	feed, err := fp.Parse(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse feed %s: %w", url, err)
+		return nil, fmt.Errorf("failed to parse feed %s: %w", feedURL, err)
 	}
 
 	result := &FeedResult{
@@ -64,7 +73,7 @@ func FetchFeed(url string) (*FeedResult, error) {
 	}
 	if result.IconURL == "" {
 		// Try deriving from feed URL itself
-		result.IconURL = deriveFaviconURL(url)
+		result.IconURL = deriveFaviconURL(feedURL)
 	}
 
 	for _, item := range feed.Items {

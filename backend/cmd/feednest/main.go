@@ -36,7 +36,7 @@ func main() {
 
 	queries := store.New(db)
 
-	sched := scheduler.New(queries, 1*time.Minute)
+	sched := scheduler.New(queries, 5*time.Minute)
 	sched.Start()
 
 	router := api.NewRouter(queries, jwtSecret, sched)

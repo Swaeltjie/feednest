@@ -34,6 +34,10 @@ function createFeedsStore() {
 			await api.del(`/api/feeds/${id}`);
 			await this.load();
 		},
+		async update(id: number, data: { title?: string; category_id?: number | null }) {
+			await api.put(`/api/feeds/${id}`, data);
+			await this.load();
+		},
 	};
 }
 

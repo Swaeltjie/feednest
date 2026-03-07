@@ -29,6 +29,11 @@
 	let deletingFeedId = $state<number | null>(null);
 	let collapsedCategories = $state<Set<number>>(new Set());
 
+	// Drag and drop state
+	let draggedFeed = $state<Feed | null>(null);
+	let dragOverCategoryId = $state<number | null>(null);
+	let dragOverUncategorized = $state(false);
+
 	function toggleCategory(e: Event, categoryId: number) {
 		e.stopPropagation();
 		const next = new Set(collapsedCategories);
@@ -87,6 +92,85 @@
 
 	function feedIcon(feed: Feed): string | null {
 		return getFaviconUrl(feed.icon_url, feed.site_url, feed.url);
+	}
+
+	// Drag handlers
+	function handleDragStart(e: DragEvent, feed: Feed) {
+		draggedFeed = feed;
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', String(feed.id));
+		}
+	}
+
+	function handleDragEnd() {
+		draggedFeed = null;
+		dragOverCategoryId = null;
+		dragOverUncategorized = false;
+	}
+
+	function handleCategoryDragOver(e: DragEvent, categoryId: number) {
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		dragOverCategoryId = categoryId;
+		dragOverUncategorized = false;
+	}
+
+	function handleUncategorizedDragOver(e: DragEvent) {
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		dragOverUncategorized = true;
+		dragOverCategoryId = null;
+	}
+
+	function handleDragLeave() {
+		dragOverCategoryId = null;
+		dragOverUncategorized = false;
+	}
+
+	async function handleCategoryDrop(e: DragEvent, targetCategoryId: number) {
+		e.preventDefault();
+		if (!draggedFeed || draggedFeed.category_id === targetCategoryId) {
+			handleDragEnd();
+			return;
+		}
+
+		const oldCategoryId = draggedFeed.category_id;
+		await feeds.update(draggedFeed.id, { category_id: targetCategoryId });
+
+		// Auto-delete empty category
+		if (oldCategoryId) {
+			await checkAndDeleteEmptyCategory(oldCategoryId);
+		}
+
+		handleDragEnd();
+	}
+
+	async function handleUncategorizedDrop(e: DragEvent) {
+		e.preventDefault();
+		if (!draggedFeed || !draggedFeed.category_id) {
+			handleDragEnd();
+			return;
+		}
+
+		const oldCategoryId = draggedFeed.category_id;
+		await feeds.update(draggedFeed.id, { category_id: null });
+
+		// Auto-delete empty category
+		if (oldCategoryId) {
+			await checkAndDeleteEmptyCategory(oldCategoryId);
+		}
+
+		handleDragEnd();
+	}
+
+	async function checkAndDeleteEmptyCategory(categoryId: number) {
+		// Reload feeds to get fresh counts, then check if category is now empty
+		await feeds.load();
+		const remainingFeeds = $feeds.filter(f => f.category_id === categoryId);
+		if (remainingFeeds.length === 0) {
+			await categories.remove(categoryId);
+		}
 	}
 </script>
 
@@ -150,7 +234,13 @@
 			{@const catUnread = totalUnread(catFeeds)}
 			{@const isCollapsed = collapsedCategories.has(category.id)}
 			{@const isActive = activeView === 'category' && activeCategory === category.id}
-			<div class="mt-1">
+			{@const isDragOver = dragOverCategoryId === category.id}
+			<div
+				class="mt-1 rounded-lg transition-all duration-200 {isDragOver ? 'bg-[var(--color-accent)]/10 ring-1 ring-[var(--color-accent)]/30' : ''}"
+				ondragover={(e) => handleCategoryDragOver(e, category.id)}
+				ondragleave={handleDragLeave}
+				ondrop={(e) => handleCategoryDrop(e, category.id)}
+			>
 				<div class="flex items-center gap-0.5">
 					<!-- Chevron toggle -->
 					<button
@@ -190,10 +280,14 @@
 					<div class="ml-3 border-l border-[var(--color-border)] pl-1">
 						{#each catFeeds as feed}
 							<button
+								draggable="true"
+								ondragstart={(e) => handleDragStart(e, feed)}
+								ondragend={handleDragEnd}
 								onclick={() => onSelectFeed(feed.id)}
 								oncontextmenu={(e) => handleContextMenu(e, feed)}
-								class="flex items-center justify-between w-full pl-3 pr-3 py-1.5 text-sm text-left transition-all rounded-lg
+								class="flex items-center justify-between w-full pl-3 pr-3 py-1.5 text-sm text-left transition-all rounded-lg cursor-grab active:cursor-grabbing
 									{deletingFeedId === feed.id ? 'opacity-40' : ''}
+									{draggedFeed?.id === feed.id ? 'opacity-30' : ''}
 									{activeView === 'feed' && activeFeed === feed.id
 										? 'glow-active text-[var(--color-accent)]'
 										: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
@@ -221,17 +315,26 @@
 		{/each}
 
 		<!-- Uncategorized feeds -->
-		{#if feedsByCategory.uncategorized.length > 0}
-			<div class="mt-1">
+		{#if feedsByCategory.uncategorized.length > 0 || draggedFeed}
+			<div
+				class="mt-1 rounded-lg transition-all duration-200 {dragOverUncategorized ? 'bg-[var(--color-accent)]/10 ring-1 ring-[var(--color-accent)]/30' : ''}"
+				ondragover={handleUncategorizedDragOver}
+				ondragleave={handleDragLeave}
+				ondrop={handleUncategorizedDrop}
+			>
 				<span class="block px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">
-					Feeds
+					{dragOverUncategorized ? 'Drop to uncategorize' : 'Feeds'}
 				</span>
 				{#each feedsByCategory.uncategorized as feed}
 					<button
+						draggable="true"
+						ondragstart={(e) => handleDragStart(e, feed)}
+						ondragend={handleDragEnd}
 						onclick={() => onSelectFeed(feed.id)}
 						oncontextmenu={(e) => handleContextMenu(e, feed)}
-						class="flex items-center justify-between w-full pl-4 pr-3 py-1.5 text-sm text-left transition-all rounded-lg
+						class="flex items-center justify-between w-full pl-4 pr-3 py-1.5 text-sm text-left transition-all rounded-lg cursor-grab active:cursor-grabbing
 							{deletingFeedId === feed.id ? 'opacity-40' : ''}
+							{draggedFeed?.id === feed.id ? 'opacity-30' : ''}
 							{activeView === 'feed' && activeFeed === feed.id
 								? 'glow-active text-[var(--color-accent)]'
 								: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"

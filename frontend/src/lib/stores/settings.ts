@@ -20,7 +20,11 @@ function createSettingsStore() {
 		const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 		const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
 
+		document.documentElement.classList.add('theme-transitioning');
 		document.documentElement.classList.toggle('dark', isDark);
+		setTimeout(() => {
+			document.documentElement.classList.remove('theme-transitioning');
+		}, 350);
 	}
 
 	// Apply initial theme

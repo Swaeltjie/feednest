@@ -32,6 +32,24 @@
   --color-text-tertiary: #484f58;
 }
 
+/* ─── Spring motion presets ─── */
+:root {
+	--spring-snappy: cubic-bezier(0.22, 1, 0.36, 1);
+	--spring-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+	--spring-dramatic: cubic-bezier(0.34, 1.56, 0.64, 1);
+	--duration-snappy: 150ms;
+	--duration-smooth: 300ms;
+	--duration-dramatic: 500ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--duration-snappy: 0ms;
+		--duration-smooth: 0ms;
+		--duration-dramatic: 0ms;
+	}
+}
+
 /* ─── Glassmorphism ─── */
 .glass {
   background: rgba(255, 255, 255, 0.7);
@@ -46,7 +64,7 @@
 .glass-card {
   background: var(--color-card);
   border: 1px solid var(--color-border);
-  transition: all 0.2s ease;
+  transition: all var(--duration-snappy) var(--spring-snappy);
 }
 .glass-card:hover {
   border-color: var(--color-border-hover);
@@ -116,7 +134,7 @@
   }
 }
 .fade-in-up {
-  animation: fadeInUp 0.3s ease-out both;
+  animation: fadeInUp var(--duration-smooth) var(--spring-smooth) both;
 }
 
 /* ─── Star bounce ─── */
@@ -126,7 +144,7 @@
   100% { transform: scale(1); }
 }
 .star-bounce {
-  animation: starBounce 0.2s ease;
+  animation: starBounce var(--duration-snappy) var(--spring-dramatic);
 }
 
 /* ─── Slide transitions ─── */
@@ -228,11 +246,22 @@ input:focus, select:focus {
 
 /* ─── Hover lift for interactive elements ─── */
 .hover-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform var(--duration-snappy) var(--spring-snappy), box-shadow var(--duration-snappy) var(--spring-snappy);
 }
 .hover-lift:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ─── Theme transition support ─── */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+	transition: background-color 300ms var(--spring-smooth),
+	            color 300ms var(--spring-smooth),
+	            border-color 300ms var(--spring-smooth),
+	            box-shadow 300ms var(--spring-smooth) !important;
 }
 
 /* ─── Accent text selection ─── */

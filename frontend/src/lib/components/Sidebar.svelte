@@ -27,6 +27,18 @@
 
 	let contextMenu = $state<{ feed: Feed; x: number; y: number } | null>(null);
 	let deletingFeedId = $state<number | null>(null);
+	let collapsedCategories = $state<Set<number>>(new Set());
+
+	function toggleCategory(e: Event, categoryId: number) {
+		e.stopPropagation();
+		const next = new Set(collapsedCategories);
+		if (next.has(categoryId)) {
+			next.delete(categoryId);
+		} else {
+			next.add(categoryId);
+		}
+		collapsedCategories = next;
+	}
 
 	function groupByCategory(feedList: Feed[], catList: Category[]) {
 		const uncategorized: Feed[] = [];
@@ -136,50 +148,75 @@
 		<!-- Categorized feeds -->
 		{#each feedsByCategory.grouped as { category, feeds: catFeeds }}
 			{@const catUnread = totalUnread(catFeeds)}
+			{@const isCollapsed = collapsedCategories.has(category.id)}
+			{@const isActive = activeView === 'category' && activeCategory === category.id}
 			<div class="mt-1">
-				<button
-					onclick={() => onSelectCategory(category.id)}
-					class="flex items-center justify-between w-full px-3 py-1.5 text-left transition-colors rounded-lg
-						{activeView === 'category' && activeCategory === category.id
-							? 'text-[var(--color-accent)]'
-							: 'hover:text-[var(--color-text-primary)]'}"
-				>
-					<span class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">
-						{category.name}
-					</span>
-					{#if catUnread > 0}
-						<span class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
-							{catUnread}
-						</span>
-					{/if}
-				</button>
-				{#each catFeeds as feed}
+				<div class="flex items-center gap-0.5">
+					<!-- Chevron toggle -->
 					<button
-						onclick={() => onSelectFeed(feed.id)}
-						oncontextmenu={(e) => handleContextMenu(e, feed)}
-						class="flex items-center justify-between w-full pl-4 pr-3 py-1.5 text-sm text-left transition-all rounded-lg
-							{deletingFeedId === feed.id ? 'opacity-40' : ''}
-							{activeView === 'feed' && activeFeed === feed.id
-								? 'glow-active text-[var(--color-accent)]'
-								: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
+						onclick={(e) => toggleCategory(e, category.id)}
+						class="p-1 rounded-md hover:bg-[var(--color-elevated)] transition-all flex-shrink-0"
+						aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+					>
+						<svg class="w-3 h-3 text-[var(--color-text-tertiary)] transition-transform duration-200 {isCollapsed ? '-rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+						</svg>
+					</button>
+
+					<!-- Category name (clickable to filter) -->
+					<button
+						onclick={() => onSelectCategory(category.id)}
+						class="flex items-center justify-between flex-1 min-w-0 px-2 py-1.5 text-left transition-all rounded-lg cursor-pointer
+							{isActive ? 'glow-active' : 'hover:bg-[var(--color-elevated)]'}"
 					>
 						<span class="flex items-center gap-2 truncate">
-							{#if feedIcon(feed)}
-								<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" />
-							{:else}
-								<span class="w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold">
-									{feed.title?.charAt(0)?.toUpperCase() || '?'}
-								</span>
-							{/if}
-							<span class="truncate">{feed.title}</span>
+							<svg class="w-3.5 h-3.5 flex-shrink-0 {isActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-tertiary)]'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+							</svg>
+							<span class="text-xs font-semibold uppercase tracking-wider truncate
+								{isActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-tertiary)]'}">
+								{category.name}
+							</span>
 						</span>
-						{#if feed.unread_count > 0}
-							<span class="ml-2 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
-								{feed.unread_count}
+						{#if catUnread > 0}
+							<span class="ml-1 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
+								{catUnread}
 							</span>
 						{/if}
 					</button>
-				{/each}
+				</div>
+
+				{#if !isCollapsed}
+					<div class="ml-3 border-l border-[var(--color-border)] pl-1">
+						{#each catFeeds as feed}
+							<button
+								onclick={() => onSelectFeed(feed.id)}
+								oncontextmenu={(e) => handleContextMenu(e, feed)}
+								class="flex items-center justify-between w-full pl-3 pr-3 py-1.5 text-sm text-left transition-all rounded-lg
+									{deletingFeedId === feed.id ? 'opacity-40' : ''}
+									{activeView === 'feed' && activeFeed === feed.id
+										? 'glow-active text-[var(--color-accent)]'
+										: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
+							>
+								<span class="flex items-center gap-2 truncate">
+									{#if feedIcon(feed)}
+										<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" onerror={(e) => { const img = e.currentTarget as HTMLImageElement; const parent = img.parentElement; if (parent) { const span = document.createElement('span'); span.className = 'w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold'; span.textContent = img.closest('button')?.textContent?.trim()?.charAt(0)?.toUpperCase() || '?'; parent.replaceChild(span, img); } }} />
+									{:else}
+										<span class="w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold">
+											{feed.title?.charAt(0)?.toUpperCase() || '?'}
+										</span>
+									{/if}
+									<span class="truncate">{feed.title}</span>
+								</span>
+								{#if feed.unread_count > 0}
+									<span class="ml-2 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
+										{feed.unread_count}
+									</span>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{/each}
 
@@ -201,7 +238,7 @@
 					>
 						<span class="flex items-center gap-2 truncate">
 							{#if feedIcon(feed)}
-								<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" />
+								<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" onerror={(e) => { const img = e.currentTarget as HTMLImageElement; const parent = img.parentElement; if (parent) { const span = document.createElement('span'); span.className = 'w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold'; span.textContent = img.closest('button')?.textContent?.trim()?.charAt(0)?.toUpperCase() || '?'; parent.replaceChild(span, img); } }} />
 							{:else}
 								<span class="w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold">
 									{feed.title?.charAt(0)?.toUpperCase() || '?'}

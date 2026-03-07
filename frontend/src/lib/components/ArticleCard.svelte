@@ -63,7 +63,7 @@
 			style="background: rgba(255,255,255,0.1); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);"
 		>
 			{#if feedIcon}
-				<img src={feedIcon} alt="" class="w-3.5 h-3.5 rounded-full" />
+				<img src={feedIcon} alt="" class="w-3.5 h-3.5 rounded-full" onerror={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
 			{/if}
 			<span>{article.feed_title}</span>
 			<span class="opacity-50">·</span>

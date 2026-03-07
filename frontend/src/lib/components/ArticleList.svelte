@@ -72,7 +72,7 @@
 
 		<div class="flex items-center gap-2 mt-1.5 text-xs text-[var(--color-text-tertiary)]">
 			{#if feedIcon}
-				<img src={feedIcon} alt="" class="w-3.5 h-3.5 rounded-full" />
+				<img src={feedIcon} alt="" class="w-3.5 h-3.5 rounded-full" onerror={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
 			{/if}
 			<span class="font-medium text-[var(--color-text-secondary)]">{article.feed_title}</span>
 			<span class="opacity-40">·</span>

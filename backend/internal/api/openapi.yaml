@@ -1,0 +1,854 @@
+openapi: 3.0.3
+info:
+  title: FeedNest API
+  description: |
+    REST API for FeedNest — a modern, self-hosted RSS feed reader.
+
+    ## Authentication
+    Most endpoints require a Bearer token. Get one via `/api/auth/login`, then pass it as `Authorization: Bearer <token>`.
+    Tokens expire after 24 hours. Use `/api/auth/refresh` with your refresh token to get a new access token.
+  version: "1.0.0"
+  contact:
+    name: FeedNest
+
+servers:
+  - url: http://localhost:8082
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Authentication and user management
+  - name: Feeds
+    description: RSS/Atom feed management
+  - name: Articles
+    description: Article listing, reading, and management
+  - name: Categories
+    description: Feed categorization
+  - name: Tags
+    description: Article tagging
+  - name: Settings
+    description: User preferences
+  - name: OPML
+    description: Import and export feeds
+  - name: Events
+    description: Reading event tracking
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        email:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    Feed:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        user_id:
+          type: integer
+          format: int64
+        url:
+          type: string
+        title:
+          type: string
+        site_url:
+          type: string
+        icon_url:
+          type: string
+        category_id:
+          type: integer
+          format: int64
+          nullable: true
+        fetch_interval:
+          type: integer
+          description: Fetch interval in seconds
+        last_fetched:
+          type: string
+          format: date-time
+          nullable: true
+        engagement_score:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        unread_count:
+          type: integer
+
+    Article:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        feed_id:
+          type: integer
+          format: int64
+        guid:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+        author:
+          type: string
+        content_raw:
+          type: string
+          description: Raw HTML content from feed
+        content_clean:
+          type: string
+          description: Cleaned content via readability extraction
+        snippet:
+          type: string
+          description: Plain-text excerpt (max 160 chars), only in list responses
+        thumbnail_url:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        fetched_at:
+          type: string
+          format: date-time
+        word_count:
+          type: integer
+        reading_time:
+          type: integer
+          description: Estimated minutes to read
+        is_read:
+          type: boolean
+        is_starred:
+          type: boolean
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+        score:
+          type: number
+          format: double
+          description: Smart ranking score
+        feed_title:
+          type: string
+        feed_icon_url:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    ArticleListResponse:
+      type: object
+      properties:
+        articles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Article'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        user_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        position:
+          type: integer
+
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        user_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      tags: [Auth]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/auth/register:
+    post:
+      summary: Create a new account
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username:
+                  type: string
+                  example: alice
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+                password:
+                  type: string
+                  format: password
+                  example: supersecret
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '409':
+          description: Username or email already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/login:
+    post:
+      summary: Login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: alice
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+
+  /api/auth/refresh:
+    post:
+      summary: Refresh access token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: New access token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+        '401':
+          description: Invalid refresh token
+
+  /api/auth/user-count:
+    get:
+      summary: Get total user count
+      description: Used to check if this is a fresh installation (no users yet)
+      tags: [Auth]
+      responses:
+        '200':
+          description: User count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+
+  /api/feeds:
+    get:
+      summary: List all feeds
+      tags: [Feeds]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of feeds with unread counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Feed'
+
+    post:
+      summary: Add a new feed
+      tags: [Feeds]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  example: https://blog.golang.org/feed.atom
+                category_id:
+                  type: integer
+                  format: int64
+                  nullable: true
+                  description: Existing category ID
+                new_category:
+                  type: string
+                  description: Create a new category with this name and assign the feed to it
+                fetch_interval:
+                  type: integer
+                  description: Custom fetch interval in seconds
+      responses:
+        '201':
+          description: Feed created (fetch triggered in background)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feed'
+        '409':
+          description: Feed URL already exists for this user
+
+  /api/feeds/{id}:
+    put:
+      summary: Update feed
+      tags: [Feeds]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                category_id:
+                  type: integer
+                  format: int64
+                  nullable: true
+                fetch_interval:
+                  type: integer
+      responses:
+        '204':
+          description: Updated
+
+    delete:
+      summary: Remove feed and all its articles
+      tags: [Feeds]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Deleted
+
+  /api/articles:
+    get:
+      summary: List articles
+      description: |
+        Returns paginated articles with filtering, sorting, search, and cross-feed deduplication.
+        Sponsored content is automatically filtered out.
+      tags: [Articles]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [unread, starred, read]
+          description: Filter by read status
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [smart, newest, oldest]
+            default: smart
+          description: "Sort order. Smart uses engagement score + recency."
+        - name: feed
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Filter by feed ID
+        - name: category
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Filter by category ID
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Filter by tag name (exact match)
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Full-text search across title and content
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: Paginated article list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleListResponse'
+
+  /api/articles/bulk:
+    post:
+      summary: Bulk update articles
+      tags: [Articles]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [article_ids, action]
+              properties:
+                article_ids:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+                action:
+                  type: string
+                  enum: [mark_read, mark_unread, star, unstar]
+      responses:
+        '204':
+          description: Bulk action applied
+
+  /api/articles/{id}:
+    get:
+      summary: Get article with full content
+      tags: [Articles]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Full article
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+        '404':
+          description: Article not found
+
+    put:
+      summary: Update article read/starred status
+      tags: [Articles]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_read:
+                  type: boolean
+                is_starred:
+                  type: boolean
+      responses:
+        '204':
+          description: Updated
+
+  /api/articles/{id}/dismiss:
+    post:
+      summary: Dismiss article
+      description: Marks article as read and logs a dismiss event
+      tags: [Articles]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Dismissed
+
+  /api/articles/{id}/tags:
+    post:
+      summary: Add tag to article
+      tags: [Tags]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: important
+      responses:
+        '204':
+          description: Tag added
+
+  /api/articles/{id}/tags/{tag}:
+    delete:
+      summary: Remove tag from article
+      tags: [Tags]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: tag
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Tag removed
+
+  /api/categories:
+    get:
+      summary: List categories
+      tags: [Categories]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of categories ordered by position
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+
+    post:
+      summary: Create category
+      tags: [Categories]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: Tech
+                position:
+                  type: integer
+                  default: 0
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+
+  /api/categories/{id}:
+    put:
+      summary: Update category
+      tags: [Categories]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                position:
+                  type: integer
+      responses:
+        '204':
+          description: Updated
+
+    delete:
+      summary: Delete category
+      description: Feeds in this category will become uncategorized
+      tags: [Categories]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Deleted
+
+  /api/tags:
+    get:
+      summary: List all tags
+      tags: [Tags]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+
+  /api/events:
+    post:
+      summary: Log reading event
+      description: Track article interactions (clicks, read time)
+      tags: [Events]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [article_id, event_type]
+              properties:
+                article_id:
+                  type: integer
+                  format: int64
+                event_type:
+                  type: string
+                  enum: [click, read, dismiss]
+                duration_seconds:
+                  type: integer
+                  default: 0
+      responses:
+        '201':
+          description: Event logged
+
+  /api/settings:
+    get:
+      summary: Get user settings
+      tags: [Settings]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Key-value settings
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+
+    put:
+      summary: Update settings
+      tags: [Settings]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+              example:
+                theme: dark
+                default_view: hybrid
+      responses:
+        '204':
+          description: Settings updated
+
+  /api/opml/import:
+    post:
+      summary: Import feeds from OPML file
+      tags: [OPML]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Import results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+                  skipped:
+                    type: integer
+
+  /api/opml/export:
+    get:
+      summary: Export feeds as OPML
+      tags: [OPML]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OPML XML file
+          content:
+            application/xml:
+              schema:
+                type: string

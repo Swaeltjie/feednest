@@ -31,6 +31,10 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	// Swagger UI
+	r.Get("/api/docs", swaggerUI)
+	r.Get("/api/docs/openapi.yaml", openapiYAML)
+
 	auth := NewAuthHandler(queries, jwtSecret)
 
 	// Public routes

@@ -192,8 +192,8 @@
 				<div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-4 mb-6 text-sm text-[var(--color-text-secondary)]">
 					{#if article.feed_title}
 						<span class="flex items-center gap-1.5">
-							{#if getFaviconUrl(article.feed_icon_url, undefined, undefined)}
-								<img src={getFaviconUrl(article.feed_icon_url, undefined, undefined)} alt="" class="w-4 h-4 rounded" loading="lazy" />
+							{#if getFaviconUrl(article.feed_icon_url, article.url, undefined)}
+								<img src={getFaviconUrl(article.feed_icon_url, article.url, undefined)} alt="" class="w-4 h-4 rounded" loading="lazy" onerror={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
 							{/if}
 							<span class="font-medium text-[var(--color-text-primary)]">{article.feed_title}</span>
 						</span>

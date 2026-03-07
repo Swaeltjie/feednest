@@ -99,6 +99,14 @@ func runMigrations(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_feeds_user_id ON feeds(user_id);
 	CREATE INDEX IF NOT EXISTS idx_feeds_category_id ON feeds(category_id);
 	CREATE INDEX IF NOT EXISTS idx_reading_events_article_id ON reading_events(article_id);
+
+	-- Composite indexes for common query patterns
+	CREATE INDEX IF NOT EXISTS idx_articles_feed_guid ON articles(feed_id, guid);
+	CREATE INDEX IF NOT EXISTS idx_articles_feed_read ON articles(feed_id, is_read);
+	CREATE INDEX IF NOT EXISTS idx_settings_user_key ON settings(user_id, key);
+	CREATE INDEX IF NOT EXISTS idx_tags_user_name ON tags(user_id, name);
+	CREATE INDEX IF NOT EXISTS idx_article_tags_article ON article_tags(article_id);
+	CREATE INDEX IF NOT EXISTS idx_article_tags_tag ON article_tags(tag_id);
 	`
 
 	_, err := db.Exec(schema)

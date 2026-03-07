@@ -1,7 +1,10 @@
 import type { Handle } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);
+
+	const backendOrigin = env.BACKEND_URL || 'http://localhost:8082';
 
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('X-Content-Type-Options', 'nosniff');
@@ -9,7 +12,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 	response.headers.set(
 		'Content-Security-Policy',
-		"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' http://localhost:8082; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'"
+		`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' ${backendOrigin}; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'`
 	);
 
 	return response;

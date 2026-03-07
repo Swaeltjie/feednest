@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - feednest-data:/data
+    environment:
+      - DB_PATH=/data/feednest.db
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - PORT=8080
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://backend:8080
+      - PORT=3000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  feednest-data:

@@ -1,1 +1,6 @@
 backend/feednest
+.env
+*.db
+node_modules/
+frontend/build/
+frontend/.svelte-kit/

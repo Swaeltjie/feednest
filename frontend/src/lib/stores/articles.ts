@@ -46,10 +46,13 @@ function createArticlesStore() {
 		loading: boolean;
 	}>({ articles: [], total: 0, loading: false });
 
+	let loadId = 0;
+
 	return {
 		subscribe,
 
 		async load(filters: ArticleFilters = {}) {
+			const thisLoad = ++loadId;
 			update((s) => ({ ...s, loading: true }));
 			const params = new URLSearchParams();
 			if (filters.status) params.set('status', filters.status);
@@ -60,8 +63,14 @@ function createArticlesStore() {
 			if (filters.search) params.set('search', filters.search);
 			if (filters.page) params.set('page', String(filters.page));
 
-			const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);
-			set({ articles: data.articles || [], total: data.total, loading: false });
+			try {
+				const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);
+				if (thisLoad !== loadId) return;
+				set({ articles: data.articles || [], total: data.total, loading: false });
+			} catch {
+				if (thisLoad !== loadId) return;
+				update((s) => ({ ...s, loading: false }));
+			}
 		},
 
 		async toggleRead(id: number, isRead: boolean) {

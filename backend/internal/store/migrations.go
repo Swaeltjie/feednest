@@ -90,7 +90,10 @@ func runMigrations(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at);
 	CREATE INDEX IF NOT EXISTS idx_articles_score ON articles(score);
 	CREATE INDEX IF NOT EXISTS idx_articles_is_read ON articles(is_read);
+	CREATE INDEX IF NOT EXISTS idx_articles_is_starred ON articles(is_starred);
+	CREATE INDEX IF NOT EXISTS idx_articles_url ON articles(url);
 	CREATE INDEX IF NOT EXISTS idx_feeds_user_id ON feeds(user_id);
+	CREATE INDEX IF NOT EXISTS idx_feeds_category_id ON feeds(category_id);
 	CREATE INDEX IF NOT EXISTS idx_reading_events_article_id ON reading_events(article_id);
 	`
 

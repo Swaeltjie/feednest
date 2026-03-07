@@ -91,6 +91,7 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 
 		articlesH := handlers.NewArticleHandler(queries)
 		r.Get("/api/articles", articlesH.List)
+		r.Post("/api/articles/mark-all-read", articlesH.MarkAllRead)
 		r.Post("/api/articles/bulk", articlesH.Bulk)
 		r.Get("/api/articles/{id}", articlesH.Get)
 		r.Put("/api/articles/{id}", articlesH.Update)

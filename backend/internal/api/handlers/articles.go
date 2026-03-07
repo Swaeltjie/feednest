@@ -142,6 +142,28 @@ func (h *ArticleHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *ArticleHandler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
+	userID := apiutil.ExtractUserID(r)
+
+	var req struct {
+		FeedID     *int64 `json:"feed_id"`
+		CategoryID *int64 `json:"category_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	affected, err := h.store.MarkAllRead(userID, req.FeedID, req.CategoryID)
+	if err != nil {
+		http.Error(w, `{"error":"failed to mark as read"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int64{"affected": affected})
+}
+
 func (h *ArticleHandler) Bulk(w http.ResponseWriter, r *http.Request) {
 	userID := apiutil.ExtractUserID(r)
 	var req models.BulkArticleRequest

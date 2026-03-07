@@ -14,6 +14,8 @@
 		onSelectFeed = (_id: number) => {},
 		onSelectCategory = (_id: number) => {},
 		onAddFeed = () => {},
+		onMarkFeedRead = (_id: number) => {},
+		onMarkCategoryRead = (_id: number) => {},
 	}: {
 		collapsed?: boolean;
 		activeFeed?: number | null;
@@ -24,9 +26,12 @@
 		onSelectFeed?: (id: number) => void;
 		onSelectCategory?: (id: number) => void;
 		onAddFeed?: () => void;
+		onMarkFeedRead?: (id: number) => void;
+		onMarkCategoryRead?: (id: number) => void;
 	} = $props();
 
 	let contextMenu = $state<{ feed: Feed; x: number; y: number } | null>(null);
+	let categoryContextMenu = $state<{ category: Category; x: number; y: number } | null>(null);
 	let deletingFeedId = $state<number | null>(null);
 	// Start with all categories collapsed; populated once categories load
 	let collapsedCategories = $state<Set<number>>(new Set());
@@ -84,11 +89,19 @@
 
 	function handleContextMenu(e: MouseEvent, feed: Feed) {
 		e.preventDefault();
+		categoryContextMenu = null;
 		contextMenu = { feed, x: e.clientX, y: e.clientY };
+	}
+
+	function handleCategoryContextMenu(e: MouseEvent, category: Category) {
+		e.preventDefault();
+		contextMenu = null;
+		categoryContextMenu = { category, x: e.clientX, y: e.clientY };
 	}
 
 	function closeContextMenu() {
 		contextMenu = null;
+		categoryContextMenu = null;
 	}
 
 	async function handleDeleteFeed(feed: Feed) {
@@ -268,6 +281,7 @@
 					<!-- Category name (clickable to filter) -->
 					<button
 						onclick={() => onSelectCategory(category.id)}
+						oncontextmenu={(e) => handleCategoryContextMenu(e, category)}
 						class="flex items-center justify-between flex-1 min-w-0 px-2 py-1.5 text-left transition-all rounded-lg cursor-pointer
 							{isActive ? 'glow-active' : 'hover:bg-[var(--color-elevated)]'}"
 					>
@@ -414,6 +428,15 @@
 		class="fixed z-[100] py-1.5 rounded-xl shadow-2xl min-w-[160px] glass border border-[var(--color-border-hover)] fade-in-up"
 		style="left: {contextMenu.x}px; top: {contextMenu.y}px; animation-duration: 100ms;"
 	>
+		<button
+			onclick={() => { if (contextMenu) { onMarkFeedRead(contextMenu.feed.id); closeContextMenu(); } }}
+			class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] transition-colors"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+			</svg>
+			Mark All as Read
+		</button>
 		{#if contextMenu?.feed.last_error}
 			<button
 				onclick={() => { if (contextMenu) { feeds.retry(contextMenu.feed.id); closeContextMenu(); } }}
@@ -433,6 +456,24 @@
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
 			</svg>
 			Remove Feed
+		</button>
+	</div>
+{/if}
+
+<!-- Category context menu -->
+{#if categoryContextMenu}
+	<div
+		class="fixed z-[100] py-1.5 rounded-xl shadow-2xl min-w-[160px] glass border border-[var(--color-border-hover)] fade-in-up"
+		style="left: {categoryContextMenu.x}px; top: {categoryContextMenu.y}px; animation-duration: 100ms;"
+	>
+		<button
+			onclick={() => { if (categoryContextMenu) { onMarkCategoryRead(categoryContextMenu.category.id); closeContextMenu(); } }}
+			class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] transition-colors"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+			</svg>
+			Mark All as Read
 		</button>
 	</div>
 {/if}

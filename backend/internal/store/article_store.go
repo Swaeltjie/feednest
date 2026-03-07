@@ -262,6 +262,31 @@ func (q *Queries) BulkUpdateArticles(userID int64, articleIDs []int64, action st
 	return err
 }
 
+func (q *Queries) MarkAllRead(userID int64, feedID *int64, categoryID *int64) (int64, error) {
+	var query string
+	var args []interface{}
+
+	if feedID != nil {
+		query = `UPDATE articles SET is_read = 1, read_at = CURRENT_TIMESTAMP
+			WHERE is_read = 0 AND feed_id = ? AND feed_id IN (SELECT id FROM feeds WHERE user_id = ?)`
+		args = []interface{}{*feedID, userID}
+	} else if categoryID != nil {
+		query = `UPDATE articles SET is_read = 1, read_at = CURRENT_TIMESTAMP
+			WHERE is_read = 0 AND feed_id IN (SELECT id FROM feeds WHERE user_id = ? AND category_id = ?)`
+		args = []interface{}{userID, *categoryID}
+	} else {
+		query = `UPDATE articles SET is_read = 1, read_at = CURRENT_TIMESTAMP
+			WHERE is_read = 0 AND feed_id IN (SELECT id FROM feeds WHERE user_id = ?)`
+		args = []interface{}{userID}
+	}
+
+	result, err := q.db.Exec(query, args...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 func (q *Queries) CreateReadingEvent(articleID int64, eventType string, durationSeconds int) error {
 	_, err := q.db.Exec(
 		"INSERT INTO reading_events (article_id, event_type, duration_seconds) VALUES (?, ?, ?)",

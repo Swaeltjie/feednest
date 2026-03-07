@@ -1,6 +1,10 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"log"
+	"strings"
+)
 
 func runMigrations(db *sql.DB) error {
 	schema := `
@@ -102,5 +106,14 @@ func runMigrations(db *sql.DB) error {
 }
 
 func runAlterMigrations(db *sql.DB) {
-	db.Exec("ALTER TABLE feeds ADD COLUMN last_error TEXT")
+	alterMigrations := []string{
+		"ALTER TABLE feeds ADD COLUMN last_error TEXT",
+	}
+	for _, stmt := range alterMigrations {
+		if _, err := db.Exec(stmt); err != nil {
+			if !strings.Contains(err.Error(), "duplicate column") {
+				log.Printf("alter migration warning: %v", err)
+			}
+		}
+	}
 }

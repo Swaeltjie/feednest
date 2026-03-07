@@ -27,5 +27,8 @@
 		"@sveltejs/adapter-node": "^5.5.4",
 		"clsx": "^2.1.1",
 		"isomorphic-dompurify": "^3.0.0"
+	},
+	"overrides": {
+		"cookie": ">=0.7.0"
 	}
 }

@@ -96,6 +96,7 @@
 		const a = $articles.articles.find((a) => a.id === id);
 		if (a && !a.is_read) {
 			articles.toggleRead(id, true);
+			feeds.adjustUnread(a.feed_id, -1);
 		}
 	}
 
@@ -133,7 +134,17 @@
 		const unreadIds = $articles.articles.filter(a => !a.is_read).map(a => a.id);
 		if (unreadIds.length === 0) return;
 		await api.post('/api/articles/bulk', { action: 'mark_read', article_ids: unreadIds });
-		await articles.load(currentFilters);
+		await Promise.all([articles.load(currentFilters), feeds.load()]);
+	}
+
+	async function markFeedRead(feedId: number) {
+		await api.post('/api/articles/mark-all-read', { feed_id: feedId });
+		await Promise.all([articles.load(currentFilters), feeds.load()]);
+	}
+
+	async function markCategoryRead(categoryId: number) {
+		await api.post('/api/articles/mark-all-read', { category_id: categoryId });
+		await Promise.all([articles.load(currentFilters), feeds.load()]);
 	}
 
 	function selectFeed(id: number) {
@@ -238,23 +249,23 @@
 	}
 
 	onMount(async () => {
-		try {
-			await Promise.all([feeds.load(), categories.load()]);
-			await articles.load(currentFilters);
-		} finally {
-			initialized = true;
-		}
-
-		// Auto-refresh every 60 seconds
+		// Set up timers first so they run regardless of initial load success
 		refreshCountdown = 300;
 		countdownInterval = setInterval(() => {
 			refreshCountdown = Math.max(0, refreshCountdown - 1);
 		}, 1000);
 		refreshInterval = setInterval(async () => {
 			refreshCountdown = 300;
-			await feeds.load();
-			await articles.load(currentFilters);
+			await feeds.load().catch(() => {});
+			await articles.load(currentFilters).catch(() => {});
 		}, 300000);
+
+		try {
+			await Promise.all([feeds.load(), categories.load()]);
+			await articles.load(currentFilters);
+		} finally {
+			initialized = true;
+		}
 
 		cleanupKeyboard = setupKeyboardShortcuts({
 			j: (e) => {
@@ -294,13 +305,17 @@
 				const articleList = $articles.articles;
 				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
 					const a = articleList[selectedIndex];
-					articles.toggleRead(a.id, !a.is_read);
+					const newRead = !a.is_read;
+					articles.toggleRead(a.id, newRead);
+					feeds.adjustUnread(a.feed_id, newRead ? -1 : 1);
 				}
 			},
 			d: (e) => {
 				const articleList = $articles.articles;
 				if (selectedIndex >= 0 && selectedIndex < articleList.length) {
-					articles.dismiss(articleList[selectedIndex].id);
+					const a = articleList[selectedIndex];
+					if (!a.is_read) feeds.adjustUnread(a.feed_id, -1);
+					articles.dismiss(a.id);
 					if (selectedIndex >= articleList.length - 1) {
 						selectedIndex = Math.max(0, articleList.length - 2);
 					}
@@ -423,6 +438,8 @@
 					onSelectFeed={selectFeed}
 					onSelectCategory={selectCategory}
 					onAddFeed={openAddFeed}
+					onMarkFeedRead={markFeedRead}
+					onMarkCategoryRead={markCategoryRead}
 				/>
 			</div>
 		</div>
@@ -639,7 +656,7 @@
 						<div style="background: var(--color-card);">
 							{#each $articles.articles as article, i (article.id)}
 								<div data-article-index={i}>
-									<ArticleList {article} selected={article.id === openArticleId} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
+									<ArticleList {article} selected={article.id === openArticleId} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
 								</div>
 							{/each}
 						</div>
@@ -658,7 +675,7 @@
 							<div style="background: var(--color-card);" class="rounded-t-2xl mx-2 mt-2">
 								{#each listArticles as article, i (article.id)}
 									<div data-article-index={$articles.articles.indexOf(article)}>
-										<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
+										<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
 									</div>
 								{/each}
 							</div>
@@ -674,7 +691,7 @@
 							<div style="background: var(--color-card);" class="m-2 rounded-2xl overflow-hidden">
 								{#each $articles.articles as article, i (article.id)}
 									<div data-article-index={i}>
-										<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => articles.toggleRead(id, isRead)} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
+										<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
 									</div>
 								{/each}
 							</div>

@@ -19,7 +19,7 @@ export interface Category {
 }
 
 function createFeedsStore() {
-	const { subscribe, set } = writable<Feed[]>([]);
+	const { subscribe, set, update } = writable<Feed[]>([]);
 
 	return {
 		subscribe,
@@ -41,6 +41,13 @@ function createFeedsStore() {
 		},
 		async retry(id: number) {
 			await api.post(`/api/feeds/${id}/retry`);
+		},
+		adjustUnread(feedId: number, delta: number) {
+			update((feeds) =>
+				feeds.map((f) =>
+					f.id === feedId ? { ...f, unread_count: Math.max(0, f.unread_count + delta) } : f
+				)
+			);
 		},
 	};
 }

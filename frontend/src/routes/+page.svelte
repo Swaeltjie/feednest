@@ -640,7 +640,7 @@
 			onclick={() => (showAddFeedModal = false)}
 			aria-label="Close modal"
 		></button>
-		<div class="relative glass rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 fade-in-up">
+		<div class="relative rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 fade-in-up border border-[var(--color-border)]" style="background: var(--color-card);">
 			<h2 class="text-lg font-semibold text-[var(--color-text-primary)]">Add Feed</h2>
 
 			{#if addFeedError}
@@ -658,7 +658,7 @@
 					type="url"
 					bind:value={feedUrl}
 					placeholder="https://example.com/feed.xml"
-					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]
+					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-base)] border border-[var(--color-border)]
 						text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
 						focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
 				/>
@@ -673,10 +673,10 @@
 						id="feed-category"
 						bind:value={feedCategoryId}
 						disabled={!!newCategoryName.trim()}
-						class="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]
+						class="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-base)] border border-[var(--color-border)]
 							text-[var(--color-text-primary)]
 							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all
-							disabled:opacity-50"
+							disabled:opacity-50 appearance-none cursor-pointer"
 					>
 						<option value={undefined}>None</option>
 						{#each $categories as cat}
@@ -688,7 +688,7 @@
 						type="text"
 						bind:value={newCategoryName}
 						placeholder="New category"
-						class="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]
+						class="flex-1 px-4 py-2.5 rounded-xl bg-[var(--color-base)] border border-[var(--color-border)]
 							text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
 							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
 					/>

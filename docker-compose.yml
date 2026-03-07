@@ -2,7 +2,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8080:8080"
+      - "8082:8080"
     volumes:
       - feednest-data:/data
     environment:
@@ -16,7 +16,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://backend:8080
+      - ORIGIN=http://localhost:3000
       - PORT=3000
     depends_on:
       - backend

@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk add --no-cache gcc musl-dev
 
@@ -8,7 +8,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=1 go build -o feednest ./cmd/feednest/
 
-FROM alpine:3.19
+FROM alpine:3.23
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /app/feednest .

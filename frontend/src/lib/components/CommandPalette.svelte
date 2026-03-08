@@ -28,6 +28,7 @@
 		onShowShortcuts,
 		onMarkAllRead,
 		onOpenExternal,
+		onOpenRules,
 	}: {
 		open: boolean;
 		onSelectFeed?: (id: number) => void;
@@ -43,6 +44,7 @@
 		onShowShortcuts?: () => void;
 		onMarkAllRead?: () => void;
 		onOpenExternal?: () => void;
+		onOpenRules?: () => void;
 	} = $props();
 
 	let query = $state('');
@@ -219,6 +221,14 @@
 			category: 'action',
 			icon: '📤',
 			action: () => { triggerOpmlExport(); close(); }
+		});
+
+		items.push({
+			id: 'action-rules',
+			label: 'Filter Rules',
+			category: 'action',
+			icon: '🔧',
+			action: () => { onOpenRules?.(); close(); }
 		});
 
 		// ── Article search (only when query is typed) ──

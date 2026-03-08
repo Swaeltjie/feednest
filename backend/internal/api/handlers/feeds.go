@@ -72,7 +72,7 @@ func (h *FeedHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.scheduler != nil {
-		h.scheduler.FetchFeedNow(feed.ID, feed.URL)
+		h.scheduler.FetchFeedNow(feed.ID, feed.URL, userID)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -155,7 +155,7 @@ func (h *FeedHandler) Retry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.scheduler != nil {
-		h.scheduler.FetchFeedNow(feed.ID, feed.URL)
+		h.scheduler.FetchFeedNow(feed.ID, feed.URL, userID)
 	}
 
 	w.WriteHeader(http.StatusAccepted)

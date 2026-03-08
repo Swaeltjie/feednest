@@ -13,6 +13,8 @@ interface SettingsState {
 	readerFontFamily: ReaderFontFamily;
 	readerLineHeight: ReaderLineHeight;
 	readerContentWidth: ReaderContentWidth;
+	calmMode: boolean;
+	autoMarkReadOnScroll: boolean;
 }
 
 export const READER_FONT_SIZE_MAP: Record<ReaderFontSize, string> = {
@@ -52,6 +54,8 @@ function createSettingsStore() {
 		readerFontFamily: (ls('feednest_reader_font_family') as ReaderFontFamily) || 'sans',
 		readerLineHeight: (ls('feednest_reader_line_height') as ReaderLineHeight) || 'comfortable',
 		readerContentWidth: (ls('feednest_reader_content_width') as ReaderContentWidth) || 'medium',
+		calmMode: ls('feednest_calm_mode') === 'true',
+		autoMarkReadOnScroll: ls('feednest_auto_mark_read_scroll') === 'true',
 	};
 
 	const { subscribe, update } = writable<SettingsState>(initial);
@@ -103,6 +107,18 @@ function createSettingsStore() {
 			update((s) => ({ ...s, readerContentWidth: width }));
 			persist('feednest_reader_content_width', width);
 			apiPersist('reader_content_width', width);
+		},
+
+		setCalmMode(enabled: boolean) {
+			update((s) => ({ ...s, calmMode: enabled }));
+			persist('feednest_calm_mode', String(enabled));
+			apiPersist('calm_mode', String(enabled));
+		},
+
+		setAutoMarkReadOnScroll(enabled: boolean) {
+			update((s) => ({ ...s, autoMarkReadOnScroll: enabled }));
+			persist('feednest_auto_mark_read_scroll', String(enabled));
+			apiPersist('auto_mark_read_scroll', String(enabled));
 		},
 	};
 }

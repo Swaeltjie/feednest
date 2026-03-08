@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -52,14 +53,17 @@ func isSnippetBlocked(text string) bool {
 }
 
 type ArticleFilter struct {
-	CategoryID *int64
-	FeedID     *int64
-	Status     string
-	Sort       string
-	Tag        string
-	Search     string
-	Page       int
-	Limit      int
+	CategoryID     *int64
+	FeedID         *int64
+	Status         string
+	Sort           string
+	Tag            string
+	Search         string
+	PublishedAfter string
+	MinReadingTime int
+	MaxReadingTime int
+	Page           int
+	Limit          int
 }
 
 func (q *Queries) CreateArticle(feedID int64, guid, title, url, author, contentRaw, contentClean, thumbnailURL string, publishedAt *time.Time, wordCount, readingTime int) error {
@@ -69,6 +73,43 @@ func (q *Queries) CreateArticle(feedID int64, guid, title, url, author, contentR
 		feedID, guid, title, url, author, contentRaw, contentClean, thumbnailURL, publishedAt, wordCount, readingTime,
 	)
 	return err
+}
+
+// CreateArticleAndApplyRules creates an article and applies auto_read/auto_star rules.
+// Returns true if the article was newly inserted.
+func (q *Queries) CreateArticleAndApplyRules(userID, feedID int64, guid, title, url, author, contentRaw, contentClean, thumbnailURL string, publishedAt *time.Time, wordCount, readingTime int) (bool, error) {
+	result, err := q.db.Exec(`
+		INSERT OR IGNORE INTO articles (feed_id, guid, title, url, author, content_raw, content_clean, thumbnail_url, published_at, word_count, reading_time)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		feedID, guid, title, url, author, contentRaw, contentClean, thumbnailURL, publishedAt, wordCount, readingTime,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if rowsAffected == 0 {
+		return false, nil // article already existed
+	}
+
+	articleID, err := result.LastInsertId()
+	if err != nil {
+		return true, err
+	}
+
+	// Apply auto rules for the newly created article
+	content := contentClean
+	if content == "" {
+		content = contentRaw
+	}
+	if err := q.ApplyAutoRules(userID, articleID, feedID, title, author, content); err != nil {
+		return true, err
+	}
+
+	return true, nil
 }
 
 func (q *Queries) GetArticle(id, userID int64) (*models.Article, error) {
@@ -130,6 +171,18 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		conditions = append(conditions, "(a.title LIKE ? ESCAPE '\\' OR a.content_clean LIKE ? ESCAPE '\\' OR a.content_raw LIKE ? ESCAPE '\\')")
 		args = append(args, searchTerm, searchTerm, searchTerm)
 	}
+	if filter.PublishedAfter != "" {
+		conditions = append(conditions, "COALESCE(a.published_at, a.fetched_at) >= ?")
+		args = append(args, filter.PublishedAfter)
+	}
+	if filter.MinReadingTime > 0 {
+		conditions = append(conditions, "a.reading_time >= ?")
+		args = append(args, filter.MinReadingTime)
+	}
+	if filter.MaxReadingTime > 0 {
+		conditions = append(conditions, "a.reading_time <= ?")
+		args = append(args, filter.MaxReadingTime)
+	}
 
 	// Cross-feed deduplication: keep only the article with the lowest ID for each URL
 	conditions = append(conditions, `a.id = (SELECT MIN(a2.id) FROM articles a2 JOIN feeds f2 ON a2.feed_id = f2.id WHERE a2.url = a.url AND f2.user_id = ? AND a2.url != '')`)
@@ -137,6 +190,38 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 
 	// Filter sponsored/ad content
 	conditions = append(conditions, `a.title NOT LIKE '%[Sponsored]%' AND a.title NOT LIKE '%[Ad]%' AND a.title NOT LIKE '%Sponsored Post%' AND a.title NOT LIKE '%Advertisement%'`)
+
+	// Apply hide rules (contains/not_contains in SQL; regex rules post-filtered)
+	hideRules, _ := q.GetHideRules(userID)
+	var regexHideRules []models.FilterRule
+	for _, rule := range hideRules {
+		col := "a." + rule.Field
+		escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(rule.Value)
+
+		if rule.FeedID != nil {
+			switch rule.Operator {
+			case "contains":
+				conditions = append(conditions, fmt.Sprintf("NOT (a.feed_id = ? AND %s LIKE ? ESCAPE '\\')", col))
+				args = append(args, *rule.FeedID, "%"+escaped+"%")
+			case "not_contains":
+				conditions = append(conditions, fmt.Sprintf("NOT (a.feed_id = ? AND %s NOT LIKE ? ESCAPE '\\')", col))
+				args = append(args, *rule.FeedID, "%"+escaped+"%")
+			case "regex":
+				regexHideRules = append(regexHideRules, rule)
+			}
+		} else {
+			switch rule.Operator {
+			case "contains":
+				conditions = append(conditions, fmt.Sprintf("%s NOT LIKE ? ESCAPE '\\'", col))
+				args = append(args, "%"+escaped+"%")
+			case "not_contains":
+				conditions = append(conditions, fmt.Sprintf("%s LIKE ? ESCAPE '\\'", col))
+				args = append(args, "%"+escaped+"%")
+			case "regex":
+				regexHideRules = append(regexHideRules, rule)
+			}
+		}
+	}
 
 	where := strings.Join(conditions, " AND ")
 
@@ -198,6 +283,37 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
+
+	// Post-filter regex hide rules
+	if len(regexHideRules) > 0 {
+		filtered := articles[:0]
+		for _, a := range articles {
+			hidden := false
+			for _, rule := range regexHideRules {
+				if rule.FeedID != nil && a.FeedID != *rule.FeedID {
+					continue
+				}
+				var fieldValue string
+				switch rule.Field {
+				case "title":
+					fieldValue = a.Title
+				case "author":
+					fieldValue = a.Author
+				case "content":
+					fieldValue = a.Snippet
+				}
+				if re, err := compileRegexCached(rule.Value); err == nil && re.MatchString(fieldValue) {
+					hidden = true
+					break
+				}
+			}
+			if !hidden {
+				filtered = append(filtered, a)
+			}
+		}
+		articles = filtered
+	}
+
 	return articles, total, nil
 }
 
@@ -285,6 +401,107 @@ func (q *Queries) MarkAllRead(userID int64, feedID *int64, categoryID *int64) (i
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+func (q *Queries) CatchUp(userID int64, strategy string, value string, count int, feedID *int64, categoryID *int64) (int64, error) {
+	switch strategy {
+	case "older_than":
+		var duration time.Duration
+		if len(value) < 2 {
+			return 0, fmt.Errorf("invalid duration value")
+		}
+		numStr := value[:len(value)-1]
+		unit := value[len(value)-1:]
+		num, err := strconv.Atoi(numStr)
+		if err != nil || num <= 0 {
+			return 0, fmt.Errorf("invalid duration number")
+		}
+		switch unit {
+		case "d":
+			duration = time.Duration(num) * 24 * time.Hour
+		case "w":
+			duration = time.Duration(num) * 7 * 24 * time.Hour
+		case "h":
+			duration = time.Duration(num) * time.Hour
+		default:
+			return 0, fmt.Errorf("invalid duration unit, use h/d/w")
+		}
+
+		cutoff := time.Now().Add(-duration)
+		var conditions []string
+		var args []interface{}
+
+		conditions = append(conditions, "a.is_read = 0")
+		conditions = append(conditions, "COALESCE(a.published_at, a.fetched_at) < ?")
+		args = append(args, cutoff)
+
+		if feedID != nil {
+			conditions = append(conditions, "a.feed_id = ?")
+			args = append(args, *feedID)
+			conditions = append(conditions, "a.feed_id IN (SELECT id FROM feeds WHERE user_id = ?)")
+			args = append(args, userID)
+		} else if categoryID != nil {
+			conditions = append(conditions, "a.feed_id IN (SELECT id FROM feeds WHERE user_id = ? AND category_id = ?)")
+			args = append(args, userID, *categoryID)
+		} else {
+			conditions = append(conditions, "a.feed_id IN (SELECT id FROM feeds WHERE user_id = ?)")
+			args = append(args, userID)
+		}
+
+		query := fmt.Sprintf(`UPDATE articles a SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE %s`,
+			strings.Join(conditions, " AND "))
+		result, err := q.db.Exec(query, args...)
+		if err != nil {
+			return 0, err
+		}
+		return result.RowsAffected()
+
+	case "keep_newest":
+		if count <= 0 {
+			return 0, fmt.Errorf("count must be positive")
+		}
+
+		var feedCondition string
+		var args []interface{}
+
+		if feedID != nil {
+			feedCondition = "f.user_id = ? AND f.id = ?"
+			args = []interface{}{userID, *feedID}
+		} else if categoryID != nil {
+			feedCondition = "f.user_id = ? AND f.category_id = ?"
+			args = []interface{}{userID, *categoryID}
+		} else {
+			feedCondition = "f.user_id = ?"
+			args = []interface{}{userID}
+		}
+
+		// Mark as read all unread articles except the newest N per feed
+		query := fmt.Sprintf(`
+			UPDATE articles SET is_read = 1, read_at = CURRENT_TIMESTAMP
+			WHERE is_read = 0
+			AND feed_id IN (SELECT id FROM feeds f WHERE %s)
+			AND id NOT IN (
+				SELECT a.id FROM articles a
+				JOIN feeds f ON a.feed_id = f.id
+				WHERE %s
+				AND a.is_read = 0
+				ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
+				LIMIT ?
+			)`, feedCondition, feedCondition)
+
+		// Double the args for the two subqueries, plus count
+		allArgs := append(args, args...)
+		allArgs = append(allArgs, count)
+
+		result, err := q.db.Exec(query, allArgs...)
+		if err != nil {
+			return 0, err
+		}
+		return result.RowsAffected()
+
+	default:
+		return 0, fmt.Errorf("unknown strategy: %s", strategy)
+	}
 }
 
 func (q *Queries) CreateReadingEvent(articleID int64, eventType string, durationSeconds int) error {

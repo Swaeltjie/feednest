@@ -187,6 +187,7 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		r.Get("/api/articles", articlesH.List)
 		r.Post("/api/articles/mark-all-read", articlesH.MarkAllRead)
 		r.Post("/api/articles/bulk", articlesH.Bulk)
+		r.Post("/api/articles/catch-up", articlesH.CatchUp)
 		r.Get("/api/articles/{id}", articlesH.Get)
 		r.Put("/api/articles/{id}", articlesH.Update)
 		r.Post("/api/articles/{id}/dismiss", articlesH.Dismiss)
@@ -202,6 +203,12 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		settingsH := handlers.NewSettingsHandler(queries)
 		r.Get("/api/settings", settingsH.Get)
 		r.Put("/api/settings", settingsH.Update)
+
+		rulesH := handlers.NewRulesHandler(queries)
+		r.Get("/api/rules", rulesH.List)
+		r.Post("/api/rules", rulesH.Create)
+		r.Put("/api/rules/{id}", rulesH.Update)
+		r.Delete("/api/rules/{id}", rulesH.Delete)
 
 		opmlH := handlers.NewOPMLHandler(queries)
 		r.Post("/api/opml/import", opmlH.Import)

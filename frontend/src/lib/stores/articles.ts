@@ -36,6 +36,8 @@ export interface ArticleFilters {
 	category?: number;
 	tag?: string;
 	search?: string;
+	published_after?: string;
+	min_reading_time?: number;
 	page?: number;
 }
 
@@ -58,6 +60,8 @@ function createArticlesStore() {
 		if (filters.category) params.set('category', String(filters.category));
 		if (filters.tag) params.set('tag', filters.tag);
 		if (filters.search) params.set('search', filters.search);
+		if (filters.published_after) params.set('published_after', filters.published_after);
+		if (filters.min_reading_time) params.set('min_reading_time', String(filters.min_reading_time));
 		return params;
 	}
 

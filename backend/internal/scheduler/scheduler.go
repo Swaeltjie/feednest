@@ -48,7 +48,7 @@ func (s *Scheduler) Stop() {
 	s.stopOnce.Do(func() { close(s.stop) })
 }
 
-func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
+func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string, userID int64) {
 	go func() {
 		result, err := fetcher.FetchFeed(feedURL)
 		if err != nil {
@@ -86,8 +86,8 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
 				}
 			}
 
-			if err := s.store.CreateArticle(
-				feedID, item.GUID, item.Title, item.URL, item.Author,
+			if _, err := s.store.CreateArticleAndApplyRules(
+				userID, feedID, item.GUID, item.Title, item.URL, item.Author,
 				contentRaw, contentClean, thumbnailURL,
 				item.PublishedAt, item.WordCount, item.ReadingTime,
 			); err != nil {
@@ -125,7 +125,7 @@ func (s *Scheduler) fetchAll() {
 		wg.Add(1)
 		sem <- struct{}{}
 
-		go func(feedID int64, feedURL, feedTitle string) {
+		go func(feedID, userID int64, feedURL, feedTitle string) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
@@ -169,8 +169,8 @@ func (s *Scheduler) fetchAll() {
 					}
 				}
 
-				if err := s.store.CreateArticle(
-					feedID, item.GUID, item.Title, item.URL, item.Author,
+				if _, err := s.store.CreateArticleAndApplyRules(
+					userID, feedID, item.GUID, item.Title, item.URL, item.Author,
 					contentRaw, contentClean, thumbnailURL,
 					item.PublishedAt, item.WordCount, item.ReadingTime,
 				); err != nil {
@@ -185,7 +185,7 @@ func (s *Scheduler) fetchAll() {
 				log.Printf("scheduler: failed to update last_fetched for feed %d: %v", feedID, err)
 			}
 			log.Printf("scheduler: fetched %s (%d items)", feedURL, len(result.Items))
-		}(feed.ID, feed.URL, feed.Title)
+		}(feed.ID, feed.UserID, feed.URL, feed.Title)
 	}
 
 	wg.Wait()

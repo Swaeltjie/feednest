@@ -3,14 +3,17 @@
 	import { auth } from '$lib/stores/auth';
 	import { getFaviconUrl } from '$lib/utils/favicon';
 	import AnimatedCount from './AnimatedCount.svelte';
+	import { settings } from '$lib/stores/settings';
 
 	let {
 		collapsed = false,
 		activeFeed = null as number | null,
 		activeCategory = null as number | null,
-		activeView = 'all' as 'all' | 'starred' | 'feed' | 'category',
+		activeView = 'all' as 'all' | 'starred' | 'today' | 'long_reads' | 'feed' | 'category',
 		onSelectAll = () => {},
 		onSelectStarred = () => {},
+		onSelectToday = () => {},
+		onSelectLongReads = () => {},
 		onSelectFeed = (_id: number) => {},
 		onSelectCategory = (_id: number) => {},
 		onAddFeed = () => {},
@@ -20,9 +23,11 @@
 		collapsed?: boolean;
 		activeFeed?: number | null;
 		activeCategory?: number | null;
-		activeView?: 'all' | 'starred' | 'feed' | 'category';
+		activeView?: 'all' | 'starred' | 'today' | 'long_reads' | 'feed' | 'category';
 		onSelectAll?: () => void;
 		onSelectStarred?: () => void;
+		onSelectToday?: () => void;
+		onSelectLongReads?: () => void;
 		onSelectFeed?: (id: number) => void;
 		onSelectCategory?: (id: number) => void;
 		onAddFeed?: () => void;
@@ -38,6 +43,7 @@
 	let initializedCollapsed = $state(false);
 
 	// Drag and drop state
+	let showSettings = $state(false);
 	let draggedFeed = $state<Feed | null>(null);
 	let dragOverCategoryId = $state<number | null>(null);
 	let dragOverUncategorized = $state(false);
@@ -102,6 +108,7 @@
 	function closeContextMenu() {
 		contextMenu = null;
 		categoryContextMenu = null;
+		showSettings = false;
 	}
 
 	async function handleDeleteFeed(feed: Feed) {
@@ -230,7 +237,7 @@
 				</svg>
 				All Articles
 			</span>
-			{#if allUnread > 0}
+			{#if !$settings.calmMode && allUnread > 0}
 				<span class="px-2 py-0.5 text-xs font-semibold rounded-full accent-gradient text-white min-w-[1.25rem] text-center">
 					<AnimatedCount value={allUnread} />
 				</span>
@@ -249,6 +256,34 @@
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
 			</svg>
 			Starred
+		</button>
+
+		<!-- Today -->
+		<button
+			onclick={onSelectToday}
+			class="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-left transition-all rounded-xl
+				{activeView === 'today'
+					? 'glow-active text-[var(--color-accent)]'
+					: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+			</svg>
+			Today
+		</button>
+
+		<!-- Long Reads -->
+		<button
+			onclick={onSelectLongReads}
+			class="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-left transition-all rounded-xl
+				{activeView === 'long_reads'
+					? 'glow-active text-[var(--color-accent)]'
+					: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+			</svg>
+			Long Reads
 		</button>
 
 		<div class="my-2.5 mx-2 border-t border-[var(--color-border)]"></div>
@@ -294,7 +329,7 @@
 								{category.name}
 							</span>
 						</span>
-						{#if catUnread > 0}
+						{#if !$settings.calmMode && catUnread > 0}
 							<span class="ml-1 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
 								<AnimatedCount value={catUnread} />
 							</span>
@@ -334,7 +369,7 @@
 										title={feed.last_error}
 									></span>
 								{/if}
-								{#if feed.unread_count > 0}
+								{#if !$settings.calmMode && feed.unread_count > 0}
 									<span class="ml-2 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
 										<AnimatedCount value={feed.unread_count} />
 									</span>
@@ -388,7 +423,7 @@
 								title={feed.last_error}
 							></span>
 						{/if}
-						{#if feed.unread_count > 0}
+						{#if !$settings.calmMode && feed.unread_count > 0}
 							<span class="ml-2 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
 								<AnimatedCount value={feed.unread_count} />
 							</span>
@@ -410,6 +445,68 @@
 			</svg>
 			Add Feed
 		</button>
+		<!-- Settings -->
+		<div class="relative">
+			<button
+				onclick={(e) => { e.stopPropagation(); showSettings = !showSettings; }}
+				class="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors
+					{showSettings
+						? 'bg-[var(--color-elevated)] text-[var(--color-text-primary)]'
+						: 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-secondary)]'}"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+				</svg>
+				Settings
+			</button>
+
+			{#if showSettings}
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="absolute bottom-full left-0 mb-1 w-full p-3 rounded-xl shadow-2xl border border-[var(--color-border-hover)] fade-in-up z-50"
+					style="background: var(--color-card); animation-duration: 100ms;"
+					onclick={(e) => e.stopPropagation()}
+				>
+					<div class="space-y-3">
+						<label class="flex items-center justify-between cursor-pointer">
+							<span class="text-xs text-[var(--color-text-secondary)]">Calm Mode</span>
+							<button
+								onclick={() => settings.setCalmMode(!$settings.calmMode)}
+								class="relative w-9 h-5 rounded-full transition-colors duration-200
+									{$settings.calmMode ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'}"
+								role="switch"
+								aria-checked={$settings.calmMode}
+								aria-label="Toggle calm mode"
+							>
+								<span
+									class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200
+										{$settings.calmMode ? 'translate-x-4' : 'translate-x-0'}"
+								></span>
+							</button>
+						</label>
+						<label class="flex items-center justify-between cursor-pointer">
+							<span class="text-xs text-[var(--color-text-secondary)]">Auto-mark read</span>
+							<button
+								onclick={() => settings.setAutoMarkReadOnScroll(!$settings.autoMarkReadOnScroll)}
+								class="relative w-9 h-5 rounded-full transition-colors duration-200
+									{$settings.autoMarkReadOnScroll ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'}"
+								role="switch"
+								aria-checked={$settings.autoMarkReadOnScroll}
+								aria-label="Toggle auto-mark read on scroll"
+							>
+								<span
+									class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200
+										{$settings.autoMarkReadOnScroll ? 'translate-x-4' : 'translate-x-0'}"
+								></span>
+							</button>
+						</label>
+					</div>
+				</div>
+			{/if}
+		</div>
+
 		<button
 			onclick={() => auth.logout()}
 			class="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--color-text-tertiary)] rounded-lg hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-secondary)] transition-colors"

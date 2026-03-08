@@ -8,15 +8,17 @@
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import KeyboardHints from '$lib/components/KeyboardHints.svelte';
+	import FilterRules from '$lib/components/FilterRules.svelte';
 	import { articles, type ArticleFilters } from '$lib/stores/articles';
 	import { feeds, categories } from '$lib/stores/feeds';
 	import { api, isSafeUrl } from '$lib/api/client';
 	import { setupKeyboardShortcuts } from '$lib/utils/keyboard';
+	import { settings } from '$lib/stores/settings';
 
 	type ViewMode = 'hybrid' | 'cards' | 'list';
 	type FilterTab = 'all' | 'unread' | 'starred';
 	type SortOption = 'smart' | 'newest' | 'oldest';
-	type SidebarView = 'all' | 'starred' | 'feed' | 'category';
+	type SidebarView = 'all' | 'starred' | 'today' | 'long_reads' | 'feed' | 'category';
 
 	let sidebarCollapsed = $state(false);
 	let mobileMenuOpen = $state(false);
@@ -38,6 +40,7 @@
 	let discoveredFeeds = $state<{ url: string; title: string; type: string }[]>([]);
 	let selectedDiscovered = $state<Set<string>>(new Set());
 	let discovering = $state(false);
+	let showAdvanced = $state(false);
 	let searchQuery = $state('');
 	let debouncedSearch = $state('');
 	let initialized = $state(false);
@@ -49,6 +52,7 @@
 	let countdownInterval: ReturnType<typeof setInterval> | undefined;
 	let commandPaletteOpen = $state(false);
 	let keyboardHintsOpen = $state(false);
+	let filterRulesOpen = $state(false);
 	let scrollY = $state(0);
 	let headerCompact = $derived(scrollY > 80);
 	let focusMode = $state(false);
@@ -62,6 +66,8 @@
 		feed: sidebarView === 'feed' && activeFeedId ? activeFeedId : undefined,
 		category: sidebarView === 'category' && activeCategoryId ? activeCategoryId : undefined,
 		search: debouncedSearch || undefined,
+		published_after: sidebarView === 'today' ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() : undefined,
+		min_reading_time: sidebarView === 'long_reads' ? 5 : undefined,
 	});
 
 	let featuredArticles = $derived(
@@ -122,6 +128,22 @@
 		mobileMenuOpen = false;
 	}
 
+	function selectToday() {
+		sidebarView = 'today';
+		activeFeedId = null;
+		activeCategoryId = null;
+		filterTab = 'all';
+		mobileMenuOpen = false;
+	}
+
+	function selectLongReads() {
+		sidebarView = 'long_reads';
+		activeFeedId = null;
+		activeCategoryId = null;
+		filterTab = 'all';
+		mobileMenuOpen = false;
+	}
+
 	function selectUnread() {
 		sidebarView = 'all';
 		activeFeedId = null;
@@ -171,6 +193,7 @@
 		addFeedError = '';
 		discoveredFeeds = [];
 		selectedDiscovered = new Set();
+		showAdvanced = false;
 		mobileMenuOpen = false;
 	}
 
@@ -398,8 +421,64 @@
 		return () => observer.disconnect();
 	});
 
+	// Auto-mark-as-read on scroll
+	$effect(() => {
+		if (!$settings.autoMarkReadOnScroll || openArticleId !== null) return;
+
+		const timers = new Map<number, ReturnType<typeof setTimeout>>();
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				for (const entry of entries) {
+					const el = entry.target as HTMLElement;
+					const articleId = Number(el.dataset.articleId);
+					if (!articleId) continue;
+
+					if (!entry.isIntersecting && entry.boundingClientRect.top < 0) {
+						// Article scrolled above viewport - start timer
+						if (!timers.has(articleId)) {
+							const timer = setTimeout(() => {
+								timers.delete(articleId);
+								const a = $articles.articles.find(x => x.id === articleId);
+								if (a && !a.is_read) {
+									articles.toggleRead(articleId, true);
+									feeds.adjustUnread(a.feed_id, -1);
+								}
+							}, 1500);
+							timers.set(articleId, timer);
+						}
+					} else {
+						// Article is visible again or below viewport - cancel timer
+						const existing = timers.get(articleId);
+						if (existing) {
+							clearTimeout(existing);
+							timers.delete(articleId);
+						}
+					}
+				}
+			},
+			{ threshold: 0 }
+		);
+
+		// Observe all article elements
+		requestAnimationFrame(() => {
+			const elements = document.querySelectorAll('[data-article-id]');
+			elements.forEach((el) => observer.observe(el));
+		});
+
+		return () => {
+			observer.disconnect();
+			for (const timer of timers.values()) {
+				clearTimeout(timer);
+			}
+			timers.clear();
+		};
+	});
+
 	let pageTitle = $derived.by(() => {
 		if (sidebarView === 'starred') return 'Starred';
+		if (sidebarView === 'today') return 'Today';
+		if (sidebarView === 'long_reads') return 'Long Reads';
 		if (sidebarView === 'feed' && activeFeedId) {
 			const feed = $feeds.find((f) => f.id === activeFeedId);
 			return feed?.title || 'Feed';
@@ -423,11 +502,11 @@
 	{#if mobileMenuOpen}
 		<div class="fixed inset-0 z-40 lg:hidden">
 			<button
-				class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+				class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
 				onclick={() => (mobileMenuOpen = false)}
 				aria-label="Close menu"
 			></button>
-			<div class="relative z-50 h-full w-64">
+			<div class="absolute inset-y-0 left-0 z-50 w-72 shadow-2xl slide-in-left">
 				<Sidebar
 					collapsed={false}
 					activeFeed={activeFeedId}
@@ -435,6 +514,8 @@
 					activeView={sidebarView}
 					onSelectAll={selectAll}
 					onSelectStarred={selectStarred}
+					onSelectToday={selectToday}
+					onSelectLongReads={selectLongReads}
 					onSelectFeed={selectFeed}
 					onSelectCategory={selectCategory}
 					onAddFeed={openAddFeed}
@@ -454,6 +535,8 @@
 			activeView={sidebarView}
 			onSelectAll={selectAll}
 			onSelectStarred={selectStarred}
+			onSelectToday={selectToday}
+			onSelectLongReads={selectLongReads}
 			onSelectFeed={selectFeed}
 			onSelectCategory={selectCategory}
 			onAddFeed={openAddFeed}
@@ -512,7 +595,7 @@
 				</div>
 
 				<!-- Search -->
-				<div class="hidden sm:flex items-center flex-1 max-w-xs mx-4">
+				<div class="hidden sm:flex items-center flex-1 max-w-xs mx-4 gap-2">
 					<div class="relative w-full">
 						<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -538,30 +621,27 @@
 							</button>
 						{/if}
 					</div>
+					{#if debouncedSearch}
+						<span class="text-xs text-[var(--color-text-tertiary)] whitespace-nowrap">
+							{$articles.loading ? 'Searching...' : `${$articles.total} results`}
+						</span>
+					{/if}
 				</div>
 
 				<div class="flex items-center gap-3">
 					<!-- Refresh countdown -->
 					<button
 						onclick={async () => { refreshCountdown = 300; await feeds.load(); await articles.load(currentFilters); }}
-						class="group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all
+						class="group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all
 							hover:bg-[var(--color-elevated)] text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)]"
-						title="Click to refresh now"
+						title="Refreshes in {Math.floor(refreshCountdown / 60)}:{String(refreshCountdown % 60).padStart(2, '0')}"
 					>
-						<svg class="w-3.5 h-3.5 transition-transform group-hover:rotate-180 duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<svg class="w-4 h-4 transition-transform group-hover:rotate-180 duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
 						</svg>
-						<span class="tabular-nums w-4 text-center">{refreshCountdown}</span>
-						<svg class="w-3 h-3 opacity-60" viewBox="0 0 36 36">
-							<circle cx="18" cy="18" r="15" fill="none" stroke="var(--color-border)" stroke-width="3" />
-							<circle cx="18" cy="18" r="15" fill="none" stroke="var(--color-accent)" stroke-width="3"
-								stroke-dasharray={2 * Math.PI * 15}
-								stroke-dashoffset={2 * Math.PI * 15 * (1 - refreshCountdown / 300)}
-								stroke-linecap="round"
-								transform="rotate(-90 18 18)"
-								class="transition-all duration-1000 ease-linear"
-							/>
-						</svg>
+						{#if refreshCountdown < 30}
+							<span class="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse"></span>
+						{/if}
 					</button>
 
 					<!-- Sort -->
@@ -657,7 +737,7 @@
 					{#if openArticleId}
 						<div style="background: var(--color-card);">
 							{#each $articles.articles as article, i (article.id)}
-								<div data-article-index={i}>
+								<div data-article-index={i} data-article-id={article.id}>
 									<ArticleList {article} selected={article.id === openArticleId} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
 								</div>
 							{/each}
@@ -668,7 +748,7 @@
 							{#if featuredArticles.length > 0}
 								<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
 									{#each featuredArticles as article, i (article.id)}
-										<div data-article-index={$articles.articles.indexOf(article)}>
+										<div data-article-index={$articles.articles.indexOf(article)} data-article-id={article.id}>
 											<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
 										</div>
 									{/each}
@@ -676,7 +756,7 @@
 							{/if}
 							<div style="background: var(--color-card);" class="rounded-t-2xl mx-2 mt-2">
 								{#each listArticles as article, i (article.id)}
-									<div data-article-index={$articles.articles.indexOf(article)}>
+									<div data-article-index={$articles.articles.indexOf(article)} data-article-id={article.id}>
 										<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
 									</div>
 								{/each}
@@ -684,7 +764,7 @@
 						{:else if viewMode === 'cards'}
 							<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
 								{#each $articles.articles as article, i (article.id)}
-									<div data-article-index={i}>
+									<div data-article-index={i} data-article-id={article.id}>
 										<ArticleCard {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
 									</div>
 								{/each}
@@ -692,7 +772,7 @@
 						{:else}
 							<div style="background: var(--color-card);" class="m-2 rounded-2xl overflow-hidden">
 								{#each $articles.articles as article, i (article.id)}
-									<div data-article-index={i}>
+									<div data-article-index={i} data-article-id={article.id}>
 										<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
 									</div>
 								{/each}
@@ -759,10 +839,14 @@
 			if (a?.url && isSafeUrl(a.url)) window.open(a.url, '_blank', 'noopener,noreferrer');
 		}
 	}}
+	onOpenRules={() => { filterRulesOpen = true; }}
 />
 
 <!-- Keyboard Hints -->
 <KeyboardHints bind:open={keyboardHintsOpen} />
+
+<!-- Filter Rules -->
+<FilterRules bind:open={filterRulesOpen} />
 
 <!-- Add Feed Modal -->
 {#if showAddFeedModal}
@@ -790,40 +874,60 @@
 					type="url"
 					bind:value={feedUrl}
 					placeholder="https://example.com/feed.xml"
+					onkeydown={(e) => { if (e.key === 'Enter' && feedUrl.trim()) handleAddFeed(); }}
 					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-hover)]
 						text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
 						focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
 				/>
 			</div>
 
-			<div>
-				<label for="feed-category" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
-					Category
-				</label>
-				<select
-					id="feed-category"
-					bind:value={feedCategoryId}
-					disabled={!!newCategoryName.trim()}
-					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-hover)]
-						text-[var(--color-text-primary)]
-						focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all
-						disabled:opacity-50 appearance-none cursor-pointer"
+			{#if showAdvanced || discoveredFeeds.length > 1}
+				<div>
+					<label for="feed-category" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
+						Category
+					</label>
+					<select
+						id="feed-category"
+						bind:value={feedCategoryId}
+						disabled={!!newCategoryName.trim()}
+						class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-hover)]
+							text-[var(--color-text-primary)]
+							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all
+							disabled:opacity-50 appearance-none cursor-pointer"
+					>
+						<option value={undefined}>None</option>
+						{#each $categories as cat}
+							<option value={cat.id}>{cat.name}</option>
+						{/each}
+					</select>
+					<div class="text-center text-xs text-[var(--color-text-tertiary)] my-2">or create new</div>
+					<input
+						type="text"
+						bind:value={newCategoryName}
+						placeholder="New category name"
+						class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-hover)]
+							text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
+							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
+					/>
+				</div>
+
+				<button
+					onclick={handleDiscover}
+					disabled={discovering || !feedUrl.trim()}
+					class="w-full px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)]
+						border border-[var(--color-border)] rounded-xl
+						hover:bg-[var(--color-elevated)] disabled:opacity-50 transition-colors"
 				>
-					<option value={undefined}>None</option>
-					{#each $categories as cat}
-						<option value={cat.id}>{cat.name}</option>
-					{/each}
-				</select>
-				<div class="text-center text-xs text-[var(--color-text-tertiary)] my-2">or create new</div>
-				<input
-					type="text"
-					bind:value={newCategoryName}
-					placeholder="New category name"
-					class="w-full px-4 py-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-hover)]
-						text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]
-						focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
-				/>
-			</div>
+					{discovering ? 'Finding...' : 'Discover feeds on page'}
+				</button>
+			{:else}
+				<button
+					onclick={() => (showAdvanced = true)}
+					class="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
+				>
+					More options...
+				</button>
+			{/if}
 
 			{#if discoveredFeeds.length > 1}
 				<div>
@@ -873,15 +977,6 @@
 						{addingFeed ? 'Adding...' : `Add ${selectedDiscovered.size} Feed${selectedDiscovered.size !== 1 ? 's' : ''}`}
 					</button>
 				{:else}
-					<button
-						onclick={handleDiscover}
-						disabled={discovering || !feedUrl.trim()}
-						class="px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)]
-							border border-[var(--color-border)] rounded-xl
-							hover:bg-[var(--color-elevated)] disabled:opacity-50 transition-colors"
-					>
-						{discovering ? 'Finding...' : 'Discover'}
-					</button>
 					<button
 						onclick={handleAddFeed}
 						disabled={addingFeed || !feedUrl.trim()}

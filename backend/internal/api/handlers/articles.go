@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
@@ -70,6 +72,24 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 			search = string([]rune(search)[:200])
 		}
 		filter.Search = search
+	}
+	if pa := r.URL.Query().Get("published_after"); pa != "" {
+		// Support relative durations like "24h", "7d", "1w" or RFC3339 strings
+		if parsed, err := parseRelativeOrAbsoluteTime(pa); err == nil {
+			filter.PublishedAfter = parsed.Format(time.RFC3339)
+		} else {
+			filter.PublishedAfter = pa
+		}
+	}
+	if mrt := r.URL.Query().Get("min_reading_time"); mrt != "" {
+		if v, err := strconv.Atoi(mrt); err == nil && v > 0 {
+			filter.MinReadingTime = v
+		}
+	}
+	if mrt := r.URL.Query().Get("max_reading_time"); mrt != "" {
+		if v, err := strconv.Atoi(mrt); err == nil && v > 0 {
+			filter.MaxReadingTime = v
+		}
 	}
 
 	articles, total, err := h.store.ListArticles(userID, filter)
@@ -200,4 +220,74 @@ func (h *ArticleHandler) Bulk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ArticleHandler) CatchUp(w http.ResponseWriter, r *http.Request) {
+	userID := apiutil.ExtractUserID(r)
+
+	var req struct {
+		Strategy   string `json:"strategy"`
+		Value      string `json:"value"`
+		Count      int    `json:"count"`
+		FeedID     *int64 `json:"feed_id"`
+		CategoryID *int64 `json:"category_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.Strategy != "older_than" && req.Strategy != "keep_newest" {
+		http.Error(w, `{"error":"strategy must be older_than or keep_newest"}`, http.StatusBadRequest)
+		return
+	}
+	if req.Strategy == "older_than" && req.Value == "" {
+		http.Error(w, `{"error":"value is required for older_than strategy"}`, http.StatusBadRequest)
+		return
+	}
+	if req.Strategy == "keep_newest" && req.Count <= 0 {
+		http.Error(w, `{"error":"count must be positive for keep_newest strategy"}`, http.StatusBadRequest)
+		return
+	}
+
+	affected, err := h.store.CatchUp(userID, req.Strategy, req.Value, req.Count, req.FeedID, req.CategoryID)
+	if err != nil {
+		http.Error(w, `{"error":"failed to catch up: `+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int64{"affected": affected})
+}
+
+// parseRelativeOrAbsoluteTime parses a time string that is either a relative
+// duration (e.g., "24h", "3d", "1w") or an RFC3339 timestamp.
+func parseRelativeOrAbsoluteTime(s string) (time.Time, error) {
+	// Try RFC3339 first
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+
+	// Try relative duration: number + unit (h/d/w)
+	if len(s) < 2 {
+		return time.Time{}, fmt.Errorf("invalid time value")
+	}
+	numStr := s[:len(s)-1]
+	unit := s[len(s)-1:]
+	num, err := strconv.Atoi(numStr)
+	if err != nil || num <= 0 {
+		return time.Time{}, fmt.Errorf("invalid duration number")
+	}
+	var duration time.Duration
+	switch unit {
+	case "h":
+		duration = time.Duration(num) * time.Hour
+	case "d":
+		duration = time.Duration(num) * 24 * time.Hour
+	case "w":
+		duration = time.Duration(num) * 7 * 24 * time.Hour
+	default:
+		return time.Time{}, fmt.Errorf("invalid duration unit")
+	}
+	return time.Now().Add(-duration), nil
 }

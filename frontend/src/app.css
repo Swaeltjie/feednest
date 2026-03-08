@@ -332,3 +332,12 @@ html.theme-transitioning *::after {
   background: var(--color-accent-glow);
   color: var(--color-text-primary);
 }
+
+/* ─── Mobile sidebar slide-in ─── */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.slide-in-left {
+  animation: slideInLeft var(--duration-smooth) var(--spring-snappy);
+}

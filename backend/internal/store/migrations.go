@@ -119,6 +119,29 @@ func runMigrations(db *sql.DB) error {
 }
 
 func runAlterMigrations(db *sql.DB) {
+	// Create new tables that don't need ALTER TABLE
+	createMigrations := []string{
+		`CREATE TABLE IF NOT EXISTS filter_rules (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id),
+			name TEXT NOT NULL,
+			feed_id INTEGER REFERENCES feeds(id) ON DELETE CASCADE,
+			field TEXT NOT NULL CHECK(field IN ('title', 'author', 'content')),
+			operator TEXT NOT NULL CHECK(operator IN ('contains', 'not_contains', 'regex')),
+			value TEXT NOT NULL,
+			action TEXT NOT NULL CHECK(action IN ('hide', 'auto_read', 'auto_star')),
+			enabled BOOLEAN DEFAULT 1,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_filter_rules_user ON filter_rules(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_filter_rules_user_action ON filter_rules(user_id, action, enabled)`,
+	}
+	for _, stmt := range createMigrations {
+		if _, err := db.Exec(stmt); err != nil {
+			log.Printf("create migration warning: %v", err)
+		}
+	}
+
 	alterMigrations := []string{
 		"ALTER TABLE feeds ADD COLUMN last_error TEXT",
 	}

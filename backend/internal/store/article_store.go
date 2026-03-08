@@ -248,13 +248,20 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		conditions = append(conditions, "COALESCE(a.published_at, a.fetched_at) >= ?")
 		args = append(args, filter.PublishedAfter)
 	}
-	if filter.MinReadingTime > 0 {
-		conditions = append(conditions, "a.reading_time >= ?")
-		args = append(args, filter.MinReadingTime)
-	}
-	if filter.MaxReadingTime > 0 {
-		conditions = append(conditions, "a.reading_time <= ?")
-		args = append(args, filter.MaxReadingTime)
+	// Filter by reading time using word_count + user's personalized WPM,
+	// so the filter matches what the user actually sees displayed.
+	if filter.MinReadingTime > 0 || filter.MaxReadingTime > 0 {
+		userWPM := q.GetUserWPM(userID)
+		if filter.MinReadingTime > 0 {
+			minWords := int(float64(filter.MinReadingTime) * userWPM)
+			conditions = append(conditions, "a.word_count >= ?")
+			args = append(args, minWords)
+		}
+		if filter.MaxReadingTime > 0 {
+			maxWords := int(math.Ceil(float64(filter.MaxReadingTime) * userWPM))
+			conditions = append(conditions, "a.word_count <= ?")
+			args = append(args, maxWords)
+		}
 	}
 
 	// Cross-feed deduplication: keep only the article with the lowest ID for each URL

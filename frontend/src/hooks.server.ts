@@ -5,7 +5,7 @@ const BACKEND_URL = env.BACKEND_URL || 'http://localhost:8082';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	// Proxy /api/* requests to the backend
-	if (event.url.pathname.startsWith('/api/') && !event.url.pathname.startsWith('/api/docs')) {
+	if (event.url.pathname.startsWith('/api/') && event.url.pathname !== '/api/docs') {
 		const target = `${BACKEND_URL}${event.url.pathname}${event.url.search}`;
 		const headers = new Headers(event.request.headers);
 		headers.delete('host');
@@ -35,7 +35,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 	response.headers.set(
 		'Content-Security-Policy',
-		`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'`
+		`default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' https: data:; connect-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'`
 	);
 
 	return response;

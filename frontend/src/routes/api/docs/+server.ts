@@ -17,10 +17,8 @@ export const GET: RequestHandler = async () => {
   <div id="swagger-ui"></div>
   <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script>
-    // Derive backend URL from current page - API runs on port 8082
-    const backendUrl = window.location.protocol + '//' + window.location.hostname + ':8082';
     SwaggerUIBundle({
-      url: backendUrl + '/api/docs/openapi.yaml',
+      url: '/api/docs/openapi.yaml',
       dom_id: '#swagger-ui',
       deepLinking: true,
       presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],

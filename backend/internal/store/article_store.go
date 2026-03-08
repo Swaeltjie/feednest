@@ -272,7 +272,10 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 	conditions = append(conditions, `a.title NOT LIKE '%[Sponsored]%' AND a.title NOT LIKE '%[Ad]%' AND a.title NOT LIKE '%Sponsored Post%' AND a.title NOT LIKE '%Advertisement%'`)
 
 	// Apply hide rules (contains/not_contains in SQL; regex rules post-filtered)
-	hideRules, _ := q.GetHideRules(userID)
+	hideRules, err := q.GetHideRules(userID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get hide rules: %w", err)
+	}
 	allowedFields := map[string]string{
 		"title":   "a.title",
 		"author":  "a.author",

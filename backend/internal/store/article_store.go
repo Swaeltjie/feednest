@@ -432,6 +432,28 @@ func (q *Queries) UpdateArticleThumbnail(id int64, thumbnailURL string) error {
 	return err
 }
 
+// GetArticlesMissingThumbnails returns articles that have a URL but no thumbnail.
+func (q *Queries) GetArticlesMissingThumbnails(limit int) ([]models.Article, error) {
+	rows, err := q.db.Query(
+		`SELECT id, url FROM articles WHERE url != '' AND (thumbnail_url IS NULL OR thumbnail_url = '') ORDER BY id DESC LIMIT ?`,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var articles []models.Article
+	for rows.Next() {
+		var a models.Article
+		if err := rows.Scan(&a.ID, &a.URL); err != nil {
+			return nil, err
+		}
+		articles = append(articles, a)
+	}
+	return articles, rows.Err()
+}
+
 func (q *Queries) UpdateArticle(id, userID int64, isRead *bool, isStarred *bool) error {
 	if isRead != nil {
 		var readAt interface{}

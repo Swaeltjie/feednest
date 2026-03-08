@@ -27,6 +27,7 @@ func New(store *store.Queries, interval time.Duration) *Scheduler {
 
 func (s *Scheduler) Start() {
 	go func() {
+		s.backfillThumbnails()
 		s.fetchAll()
 
 		ticker := time.NewTicker(s.interval)
@@ -42,6 +43,48 @@ func (s *Scheduler) Start() {
 		}
 	}()
 	log.Printf("Feed scheduler started (interval: %v)", s.interval)
+}
+
+// backfillThumbnails fetches thumbnails for existing articles that are missing them.
+func (s *Scheduler) backfillThumbnails() {
+	articles, err := s.store.GetArticlesMissingThumbnails(500)
+	if err != nil {
+		log.Printf("scheduler: failed to get articles missing thumbnails: %v", err)
+		return
+	}
+	if len(articles) == 0 {
+		return
+	}
+
+	log.Printf("scheduler: backfilling thumbnails for %d articles", len(articles))
+
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 5)
+	filled := 0
+
+	for _, a := range articles {
+		wg.Add(1)
+		sem <- struct{}{}
+
+		go func(id int64, articleURL string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			result, err := readability.Extract(articleURL)
+			if err != nil || result.ThumbnailURL == "" {
+				return
+			}
+
+			if err := s.store.UpdateArticleThumbnail(id, result.ThumbnailURL); err != nil {
+				log.Printf("scheduler: failed to update thumbnail for article %d: %v", id, err)
+				return
+			}
+			filled++
+		}(a.ID, a.URL)
+	}
+
+	wg.Wait()
+	log.Printf("scheduler: backfilled %d/%d thumbnails", filled, len(articles))
 }
 
 func (s *Scheduler) Stop() {

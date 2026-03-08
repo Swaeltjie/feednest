@@ -43,16 +43,12 @@ Most RSS readers feel like they stopped evolving in 2010. FeedNest brings a mode
 ```bash
 git clone https://github.com/Swaeltjie/feednest.git
 cd feednest
-
-# Configure your public URL (required)
-echo "ORIGIN=https://feeds.example.com" > .env
-
 docker compose up -d
 ```
 
-Open your URL, create your account, and start reading. That's it.
+Open **http://localhost:3000**, create your account, and start reading. That's it.
 
-> **Local dev?** Use `docker compose -f docker-compose.dev.yml up --build -d` instead — no `.env` needed, defaults to `http://localhost:3000`.
+> **Deploying behind a reverse proxy?** Create a `.env` file with `ORIGIN=https://feeds.example.com` to set your public URL for CSRF protection.
 
 <br/>
 
@@ -185,7 +181,7 @@ cd frontend && npm install && npm run dev  # Frontend on :5173 with HMR
 | `PORT` | `8080` | Backend listen port |
 | `DB_PATH` | `./feednest.db` | SQLite database path |
 | `JWT_SECRET` | *auto-generated* | JWT signing key — auto-generated and persisted if not set |
-| `ORIGIN` | *required* | Your public URL for CSRF protection (e.g. `https://feeds.example.com`) |
+| `ORIGIN` | `http://localhost:3000` | Public URL for CSRF protection — set via `.env` when using a reverse proxy |
 | `TRUSTED_PROXY_IPS` | — | Comma-separated IPs of trusted reverse proxies (enables X-Forwarded-For) |
 | `ALLOWED_ORIGINS` | `localhost:5173,localhost:3000` | CORS allowed origins (comma-separated) |
 

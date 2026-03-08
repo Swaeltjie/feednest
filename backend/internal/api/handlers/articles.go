@@ -158,15 +158,20 @@ func (h *ArticleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// try extracting full article content on demand (RSS feeds often only
 	// provide a summary/teaser, and initial extraction may have failed).
 	if article.ContentClean == "" && article.URL != "" {
-		if clean, err := readability.ExtractContent(article.URL); err == nil && clean != "" {
-			article.ContentClean = clean
-			wordCount := countWordsFromHTML(clean)
+		if extracted, err := readability.Extract(article.URL); err == nil && extracted.Content != "" {
+			article.ContentClean = extracted.Content
+			wordCount := countWordsFromHTML(extracted.Content)
 			readingTime := int(math.Ceil(float64(wordCount) / 200.0))
 			article.WordCount = wordCount
 			article.ReadingTime = readingTime
-			// Persist so we don't re-extract next time
-			if err := h.store.UpdateArticleContent(id, clean, wordCount, readingTime); err != nil {
+			if err := h.store.UpdateArticleContent(id, extracted.Content, wordCount, readingTime); err != nil {
 				log.Printf("lazy-extract: failed to persist content for article %d: %v", id, err)
+			}
+			if article.ThumbnailURL == "" && extracted.ThumbnailURL != "" {
+				article.ThumbnailURL = extracted.ThumbnailURL
+				if err := h.store.UpdateArticleThumbnail(id, extracted.ThumbnailURL); err != nil {
+					log.Printf("lazy-extract: failed to persist thumbnail for article %d: %v", id, err)
+				}
 			}
 		}
 	}

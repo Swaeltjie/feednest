@@ -85,11 +85,11 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string, userID int64) {
 
 			var contentClean string
 			if item.URL != "" {
-				if clean, err := readability.ExtractContent(item.URL); err == nil {
-					contentClean = clean
-				}
-				if thumbnailURL == "" {
-					thumbnailURL = readability.ExtractThumbnailFromHTML(item.ContentRaw)
+				if extracted, err := readability.Extract(item.URL); err == nil {
+					contentClean = extracted.Content
+					if thumbnailURL == "" {
+						thumbnailURL = extracted.ThumbnailURL
+					}
 				}
 			}
 

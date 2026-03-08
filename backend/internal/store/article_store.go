@@ -424,6 +424,14 @@ func (q *Queries) UpdateArticleContent(id int64, contentClean string, wordCount,
 	return err
 }
 
+func (q *Queries) UpdateArticleThumbnail(id int64, thumbnailURL string) error {
+	_, err := q.db.Exec(
+		`UPDATE articles SET thumbnail_url = ? WHERE id = ?`,
+		thumbnailURL, id,
+	)
+	return err
+}
+
 func (q *Queries) UpdateArticle(id, userID int64, isRead *bool, isStarred *bool) error {
 	if isRead != nil {
 		var readAt interface{}

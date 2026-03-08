@@ -3,7 +3,7 @@
 	import { timeAgo } from '$lib/utils/time';
 	import { getFaviconUrl, handleFaviconError } from '$lib/utils/favicon';
 	import { api } from '$lib/api/client';
-	import DOMPurify from 'isomorphic-dompurify';
+	import { DOMPurify, initSanitizer } from '$lib/utils/sanitize';
 	import { isSafeUrl } from '$lib/api/client';
 	import ReaderSettings from './ReaderSettings.svelte';
 	import {
@@ -14,19 +14,7 @@
 		READER_CONTENT_WIDTH_MAP,
 	} from '$lib/stores/settings';
 
-	// Harden DOMPurify: add noreferrer to target=_blank links, strip style attrs
-	DOMPurify.addHook('afterSanitizeAttributes', (node: Element) => {
-		if (node.tagName === 'A') {
-			const href = node.getAttribute('href');
-			if (href && !isSafeUrl(href)) {
-				node.removeAttribute('href');
-			}
-			if (node.getAttribute('target') === '_blank') {
-				node.setAttribute('rel', 'noopener noreferrer');
-			}
-		}
-		node.removeAttribute('style');
-	});
+	initSanitizer();
 	import { blurUp } from '$lib/utils/blurload';
 
 	let {

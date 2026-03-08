@@ -50,6 +50,7 @@ function createArticlesStore() {
 	}>({ articles: [], total: 0, loading: false, loadingMore: false });
 
 	let loadId = 0;
+	let loadMoreId = 0;
 	const PAGE_SIZE = 30;
 
 	function buildParams(filters: ArticleFilters): URLSearchParams {
@@ -95,7 +96,7 @@ function createArticlesStore() {
 
 			if (currentLength >= currentTotal) return;
 
-			const thisLoad = ++loadId;
+			const thisLoadMore = ++loadMoreId;
 			update((s) => ({ ...s, loadingMore: true }));
 
 			const nextPage = Math.floor(currentLength / PAGE_SIZE) + 1;
@@ -104,7 +105,7 @@ function createArticlesStore() {
 
 			try {
 				const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);
-				if (thisLoad !== loadId) return;
+				if (thisLoadMore !== loadMoreId) return;
 				update((s) => {
 					const existing = new Set(s.articles.map((a) => a.id));
 					const newArticles = (data.articles || []).filter((a) => !existing.has(a.id));
@@ -116,7 +117,7 @@ function createArticlesStore() {
 					};
 				});
 			} catch {
-				if (thisLoad !== loadId) return;
+				if (thisLoadMore !== loadMoreId) return;
 				update((s) => ({ ...s, loadingMore: false }));
 			}
 		},
@@ -156,12 +157,35 @@ function createArticlesStore() {
 		},
 
 		async dismiss(id: number) {
-			await api.post(`/api/articles/${id}/dismiss`);
-			update((s) => ({
-				...s,
-				articles: s.articles.filter((a) => a.id !== id),
-				total: s.total - 1,
-			}));
+			// Optimistic update with rollback on failure
+			let removedArticle: Article | null = null;
+			let removedIndex = -1;
+			update((s) => {
+				const idx = s.articles.findIndex((a) => a.id === id);
+				if (idx !== -1) {
+					removedArticle = s.articles[idx];
+					removedIndex = idx;
+				}
+				return {
+					...s,
+					articles: s.articles.filter((a) => a.id !== id),
+					total: s.total - 1,
+				};
+			});
+			try {
+				await api.post(`/api/articles/${id}/dismiss`);
+			} catch {
+				// Rollback on failure
+				if (removedArticle && removedIndex >= 0) {
+					const art = removedArticle;
+					const idx = removedIndex;
+					update((s) => {
+						const articles = [...s.articles];
+						articles.splice(idx, 0, art);
+						return { ...s, articles, total: s.total + 1 };
+					});
+				}
+			}
 		},
 
 		async getArticle(id: number): Promise<Article> {

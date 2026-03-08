@@ -284,12 +284,14 @@
 				'/api/feeds/discover',
 				{ url: feedUrl.trim() }
 			);
-			if (data.feeds.length === 1) {
+			if (data.feeds?.length === 1) {
 				feedUrl = data.feeds[0].url;
 				await handleAddFeed();
-			} else {
+			} else if (data.feeds?.length) {
 				discoveredFeeds = data.feeds;
 				selectedDiscovered = new Set(data.feeds.map((f) => f.url));
+			} else {
+				addFeedError = 'No feeds found at this URL';
 			}
 		} catch (err) {
 			addFeedError = err instanceof Error ? err.message : 'No feeds found at this URL';
@@ -395,9 +397,11 @@
 					const a = articleList[selectedIndex];
 					if (!a.is_read) feeds.adjustUnread(a.feed_id, -1);
 					articles.dismiss(a.id);
-					const remaining = $articles.articles;
-					if (selectedIndex >= remaining.length) {
-						selectedIndex = Math.max(0, remaining.length - 1);
+					// dismiss is now optimistic, so the store is updated synchronously
+					// Adjust index after the optimistic removal
+					const remaining = articleList.length - 1;
+					if (selectedIndex >= remaining) {
+						selectedIndex = Math.max(0, remaining - 1);
 					}
 				}
 			},

@@ -5,7 +5,7 @@
 	import { timeAgo } from '$lib/utils/time';
 	import { api } from '$lib/api/client';
 	import { onMount } from 'svelte';
-	import DOMPurify from 'isomorphic-dompurify';
+	import { DOMPurify, initSanitizer } from '$lib/utils/sanitize';
 	import { isSafeUrl } from '$lib/api/client';
 	import ReaderSettings from '$lib/components/ReaderSettings.svelte';
 	import {
@@ -16,18 +16,7 @@
 		READER_CONTENT_WIDTH_MAP,
 	} from '$lib/stores/settings';
 
-	DOMPurify.addHook('afterSanitizeAttributes', (node: Element) => {
-		if (node.tagName === 'A') {
-			const href = node.getAttribute('href');
-			if (href && !isSafeUrl(href)) {
-				node.removeAttribute('href');
-			}
-			if (node.getAttribute('target') === '_blank') {
-				node.setAttribute('rel', 'noopener noreferrer');
-			}
-		}
-		node.removeAttribute('style');
-	});
+	initSanitizer();
 
 	let article: Article | null = $state(null);
 	let loading = $state(true);
@@ -65,7 +54,7 @@
 					article_id: article.id,
 					event_type: 'read',
 					duration_seconds: duration,
-				});
+				}).catch(() => {});
 			}
 		}
 	}

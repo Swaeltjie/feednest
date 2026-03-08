@@ -530,24 +530,24 @@ func (q *Queries) CatchUp(userID int64, strategy string, value string, count int
 		var conditions []string
 		var args []interface{}
 
-		conditions = append(conditions, "a.is_read = 0")
-		conditions = append(conditions, "COALESCE(a.published_at, a.fetched_at) < ?")
+		conditions = append(conditions, "is_read = 0")
+		conditions = append(conditions, "COALESCE(published_at, fetched_at) < ?")
 		args = append(args, cutoff)
 
 		if feedID != nil {
-			conditions = append(conditions, "a.feed_id = ?")
+			conditions = append(conditions, "feed_id = ?")
 			args = append(args, *feedID)
-			conditions = append(conditions, "a.feed_id IN (SELECT id FROM feeds WHERE user_id = ?)")
+			conditions = append(conditions, "feed_id IN (SELECT id FROM feeds WHERE user_id = ?)")
 			args = append(args, userID)
 		} else if categoryID != nil {
-			conditions = append(conditions, "a.feed_id IN (SELECT id FROM feeds WHERE user_id = ? AND category_id = ?)")
+			conditions = append(conditions, "feed_id IN (SELECT id FROM feeds WHERE user_id = ? AND category_id = ?)")
 			args = append(args, userID, *categoryID)
 		} else {
-			conditions = append(conditions, "a.feed_id IN (SELECT id FROM feeds WHERE user_id = ?)")
+			conditions = append(conditions, "feed_id IN (SELECT id FROM feeds WHERE user_id = ?)")
 			args = append(args, userID)
 		}
 
-		query := fmt.Sprintf(`UPDATE articles a SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE %s`,
+		query := fmt.Sprintf(`UPDATE articles SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE %s`,
 			strings.Join(conditions, " AND "))
 		result, err := q.db.Exec(query, args...)
 		if err != nil {
@@ -580,12 +580,15 @@ func (q *Queries) CatchUp(userID int64, strategy string, value string, count int
 			WHERE is_read = 0
 			AND feed_id IN (SELECT id FROM feeds f WHERE %s)
 			AND id NOT IN (
-				SELECT a.id FROM articles a
-				JOIN feeds f ON a.feed_id = f.id
-				WHERE %s
-				AND a.is_read = 0
-				ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
-				LIMIT ?
+				SELECT id FROM (
+					SELECT a.id,
+						ROW_NUMBER() OVER (PARTITION BY a.feed_id
+							ORDER BY COALESCE(a.published_at, a.fetched_at) DESC) AS rn
+					FROM articles a
+					JOIN feeds f ON a.feed_id = f.id
+					WHERE %s
+					AND a.is_read = 0
+				) WHERE rn <= ?
 			)`, feedCondition, feedCondition)
 
 		// Double the args for the two subqueries, plus count

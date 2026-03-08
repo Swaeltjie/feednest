@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -45,7 +47,11 @@ func (h *TagHandler) AddToArticle(w http.ResponseWriter, r *http.Request) {
 
 	// Verify the article belongs to this user
 	if _, err := h.store.GetArticle(articleID, userID); err != nil {
-		http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		} else {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -80,7 +86,11 @@ func (h *TagHandler) RemoveFromArticle(w http.ResponseWriter, r *http.Request) {
 	}
 	// Verify the article belongs to this user
 	if _, err := h.store.GetArticle(articleID, userID); err != nil {
-		http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		} else {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		}
 		return
 	}
 

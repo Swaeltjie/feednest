@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -121,7 +123,11 @@ func (h *ArticleHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	article, err := h.store.GetArticle(id, userID)
 	if err != nil {
-		http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		} else {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		}
 		return
 	}
 

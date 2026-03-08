@@ -86,10 +86,19 @@ func (rl *rateLimiter) allow(ip string) bool {
 func rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Use RemoteAddr only — X-Forwarded-For can be spoofed to bypass rate limiting.
+			// If behind a trusted reverse proxy, configure TRUSTED_PROXY_IPS to allow forwarded IPs.
 			ip := r.RemoteAddr
-			if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-				ip = strings.SplitN(fwd, ",", 2)[0]
-				ip = strings.TrimSpace(ip)
+			if trustedProxies := os.Getenv("TRUSTED_PROXY_IPS"); trustedProxies != "" {
+				remoteIP := strings.Split(r.RemoteAddr, ":")[0]
+				for _, trusted := range strings.Split(trustedProxies, ",") {
+					if strings.TrimSpace(trusted) == remoteIP {
+						if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+							ip = strings.TrimSpace(strings.SplitN(fwd, ",", 2)[0])
+						}
+						break
+					}
+				}
 			}
 			if !rl.allow(ip) {
 				http.Error(w, `{"error":"too many requests, please try again later"}`, http.StatusTooManyRequests)
@@ -118,10 +127,14 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		})
 	})
 
-	// Global request body size limit (1MB)
+	// Global request body size limit (1MB, 5MB for OPML imports)
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r.Body = http.MaxBytesReader(w, r.Body, 1*1024*1024)
+			if r.URL.Path == "/api/opml/import" {
+				r.Body = http.MaxBytesReader(w, r.Body, 5*1024*1024)
+			} else {
+				r.Body = http.MaxBytesReader(w, r.Body, 1*1024*1024)
+			}
 			next.ServeHTTP(w, r)
 		})
 	})

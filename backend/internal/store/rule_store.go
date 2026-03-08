@@ -247,6 +247,10 @@ func (q *Queries) ApplyAutoRules(userID, articleID, feedID int64, title, author,
 	return nil
 }
 
+func (q *Queries) GetRule(id, userID int64) (*models.FilterRule, error) {
+	return q.getRuleByID(id, userID)
+}
+
 func (q *Queries) getRuleByID(id, userID int64) (*models.FilterRule, error) {
 	var r models.FilterRule
 	err := q.db.QueryRow(`

@@ -333,7 +333,9 @@
 			}
 		};
 		input.click();
-		input.remove();
+		// Don't remove immediately — some browsers cancel the file picker
+		// if the input is removed from the DOM before onchange fires
+		setTimeout(() => input.remove(), 60000);
 	}
 
 	async function triggerOpmlExport() {

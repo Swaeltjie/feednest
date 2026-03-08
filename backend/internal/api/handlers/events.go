@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/feednest/backend/internal/apiutil"
@@ -41,7 +43,11 @@ func (h *EventHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Verify the article belongs to this user
 	if _, err := h.store.GetArticle(req.ArticleID, userID); err != nil {
-		http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		} else {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		}
 		return
 	}
 

@@ -58,11 +58,18 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string, userID int64) {
 		}
 
 		if result.Title != "" {
-			if err := s.store.UpdateFeedMetadata(feedID, &store.FeedMetadataUpdate{
-				Title:   &result.Title,
-				SiteURL: &result.SiteURL,
-				IconURL: &result.IconURL,
-			}); err != nil {
+			update := &store.FeedMetadataUpdate{}
+			// Only set title/siteURL if the feed doesn't have one yet
+			// (preserves user-set titles from PUT /api/feeds/{id})
+			feed, feedErr := s.store.GetFeed(feedID, userID)
+			if feedErr == nil && feed.Title == "" {
+				update.Title = &result.Title
+				update.SiteURL = &result.SiteURL
+			}
+			if result.IconURL != "" {
+				update.IconURL = &result.IconURL
+			}
+			if err := s.store.UpdateFeedMetadata(feedID, update); err != nil {
 				log.Printf("scheduler: failed to update metadata for feed %d: %v", feedID, err)
 			}
 		}

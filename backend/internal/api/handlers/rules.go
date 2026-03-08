@@ -134,6 +134,16 @@ func (h *RulesHandler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// If only value is being updated, check if existing rule uses regex operator
+	if req.Value != nil && req.Operator == nil {
+		existing, err := h.store.GetRule(id, userID)
+		if err == nil && existing.Operator == "regex" {
+			if _, err := regexp.Compile(*req.Value); err != nil {
+				http.Error(w, `{"error":"invalid regex pattern"}`, http.StatusBadRequest)
+				return
+			}
+		}
+	}
 
 	if err := h.store.UpdateRule(id, userID, req); err != nil {
 		http.Error(w, `{"error":"failed to update rule"}`, http.StatusInternalServerError)

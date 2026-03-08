@@ -113,7 +113,10 @@ func (h *FeedHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Check if category_id was explicitly set to null (uncategorize)
 	var raw map[string]json.RawMessage
-	json.Unmarshal(bodyBytes, &raw)
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
 	clearCategory := false
 	if catRaw, exists := raw["category_id"]; exists && string(catRaw) == "null" {
 		clearCategory = true

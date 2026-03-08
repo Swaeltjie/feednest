@@ -55,7 +55,7 @@ function createSettingsStore() {
 		readerFontFamily: (ls('feednest_reader_font_family') as ReaderFontFamily) || 'sans',
 		readerLineHeight: (ls('feednest_reader_line_height') as ReaderLineHeight) || 'comfortable',
 		readerContentWidth: (ls('feednest_reader_content_width') as ReaderContentWidth) || 'medium',
-		calmMode: ls('feednest_calm_mode') === 'true',
+		calmMode: ls('feednest_calm_mode') !== 'false',
 		autoMarkReadOnScroll: ls('feednest_auto_mark_read_scroll') === 'true',
 		infiniteScroll: ls('feednest_infinite_scroll') !== 'false',
 	};

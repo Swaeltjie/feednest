@@ -24,7 +24,7 @@ type ReadingStats struct {
 // WPM cache: stores per-user words-per-minute with a 5-minute TTL.
 var (
 	wpmCache   = make(map[int64]cachedWPM)
-	wpmCacheMu sync.RWMutex
+	wpmCacheMu sync.Mutex
 )
 
 type cachedWPM struct {
@@ -39,13 +39,14 @@ type cachedWPM struct {
 func (q *Queries) GetUserWPM(userID int64) float64 {
 	const defaultWPM = 200.0
 
-	// Check cache first
-	wpmCacheMu.RLock()
+	// Single Lock for the entire check-and-set to avoid race condition.
+	// Less concurrent but safe for SQLite's single-connection model.
+	wpmCacheMu.Lock()
+	defer wpmCacheMu.Unlock()
+
 	if cached, ok := wpmCache[userID]; ok && time.Now().Before(cached.expiresAt) {
-		wpmCacheMu.RUnlock()
 		return cached.value
 	}
-	wpmCacheMu.RUnlock()
 
 	var avgWPM sql.NullFloat64
 	var cnt int
@@ -60,7 +61,7 @@ func (q *Queries) GetUserWPM(userID int64) float64 {
 		  AND re.duration_seconds <= 1800
 		  AND a.word_count >= 50`, userID).Scan(&avgWPM, &cnt)
 	if err != nil || cnt < 5 || !avgWPM.Valid {
-		q.cacheWPM(userID, defaultWPM)
+		wpmCache[userID] = cachedWPM{value: defaultWPM, expiresAt: time.Now().Add(5 * time.Minute)}
 		return defaultWPM
 	}
 
@@ -72,14 +73,8 @@ func (q *Queries) GetUserWPM(userID int64) float64 {
 		wpm = 600
 	}
 
-	q.cacheWPM(userID, wpm)
-	return wpm
-}
-
-func (q *Queries) cacheWPM(userID int64, wpm float64) {
-	wpmCacheMu.Lock()
 	wpmCache[userID] = cachedWPM{value: wpm, expiresAt: time.Now().Add(5 * time.Minute)}
-	wpmCacheMu.Unlock()
+	return wpm
 }
 
 var htmlTagRe = regexp.MustCompile(`<[^>]*>`)
@@ -271,9 +266,17 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 
 	// Apply hide rules (contains/not_contains in SQL; regex rules post-filtered)
 	hideRules, _ := q.GetHideRules(userID)
+	allowedFields := map[string]string{
+		"title":   "a.title",
+		"author":  "a.author",
+		"content": "a.content_raw",
+	}
 	var regexHideRules []models.FilterRule
 	for _, rule := range hideRules {
-		col := "a." + rule.Field
+		col, ok := allowedFields[rule.Field]
+		if !ok {
+			continue // skip invalid field
+		}
 		escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(rule.Value)
 
 		if rule.FeedID != nil {
@@ -501,6 +504,9 @@ func (q *Queries) CatchUp(userID int64, strategy string, value string, count int
 		num, err := strconv.Atoi(numStr)
 		if err != nil || num <= 0 {
 			return 0, fmt.Errorf("invalid duration number")
+		}
+		if num > 36500 {
+			return 0, fmt.Errorf("duration value too large, max 36500")
 		}
 		switch unit {
 		case "d":

@@ -45,7 +45,7 @@
 	let debouncedSearch = $state('');
 	let initialized = $state(false);
 	let selectedIndex = $state(-1);
-	let cleanupKeyboard: (() => void) | undefined;
+	let cleanupKeyboard: () => void = () => {};
 	let openArticleId = $state<number | null>(null);
 	let refreshCountdown = $state(300);
 	let refreshInterval: ReturnType<typeof setInterval> | undefined;
@@ -404,8 +404,9 @@
 					const a = articleList[selectedIndex];
 					if (!a.is_read) feeds.adjustUnread(a.feed_id, -1);
 					articles.dismiss(a.id);
-					if (selectedIndex >= articleList.length - 1) {
-						selectedIndex = Math.max(0, articleList.length - 2);
+					const remaining = $articles.articles;
+					if (selectedIndex >= remaining.length) {
+						selectedIndex = Math.max(0, remaining.length - 1);
 					}
 				}
 			},
@@ -454,7 +455,7 @@
 	});
 
 	onDestroy(() => {
-		cleanupKeyboard?.();
+		cleanupKeyboard();
 		clearInterval(refreshInterval);
 		clearInterval(countdownInterval);
 	});

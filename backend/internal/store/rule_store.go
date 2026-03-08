@@ -27,6 +27,10 @@ func compileRegexCached(pattern string) (*regexp.Regexp, error) {
 	}
 
 	regexCacheMu.Lock()
+	if len(regexCache) >= 100 {
+		// Simple eviction: clear the entire cache when it reaches max size
+		regexCache = make(map[string]*regexp.Regexp)
+	}
 	regexCache[pattern] = re
 	regexCacheMu.Unlock()
 	return re, nil

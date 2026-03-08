@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -252,7 +253,8 @@ func (h *ArticleHandler) CatchUp(w http.ResponseWriter, r *http.Request) {
 
 	affected, err := h.store.CatchUp(userID, req.Strategy, req.Value, req.Count, req.FeedID, req.CategoryID)
 	if err != nil {
-		http.Error(w, `{"error":"failed to catch up: `+err.Error()+`"}`, http.StatusBadRequest)
+		log.Printf("catch-up failed for user %d: %v", userID, err)
+		http.Error(w, "catch-up failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -277,6 +279,9 @@ func parseRelativeOrAbsoluteTime(s string) (time.Time, error) {
 	num, err := strconv.Atoi(numStr)
 	if err != nil || num <= 0 {
 		return time.Time{}, fmt.Errorf("invalid duration number")
+	}
+	if num > 36500 {
+		return time.Time{}, fmt.Errorf("duration value too large, max 36500")
 	}
 	var duration time.Duration
 	switch unit {

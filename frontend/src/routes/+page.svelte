@@ -67,7 +67,7 @@
 		category: sidebarView === 'category' && activeCategoryId ? activeCategoryId : undefined,
 		search: debouncedSearch || undefined,
 		published_after: sidebarView === 'today' ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() : undefined,
-		min_reading_time: sidebarView === 'long_reads' ? 5 : undefined,
+		min_reading_time: sidebarView === 'long_reads' ? 10 : undefined,
 	});
 
 	let featuredArticles = $derived(

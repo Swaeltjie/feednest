@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 
 	"github.com/feednest/backend/internal/apiutil"
@@ -36,6 +37,16 @@ func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(settings)
+}
+
+func (h *SettingsHandler) GetWPM(w http.ResponseWriter, r *http.Request) {
+	userID := apiutil.ExtractUserID(r)
+	wpm := h.store.GetUserWPM(userID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"wpm":         math.Round(wpm),
+		"default_wpm": 200,
+	})
 }
 
 func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {

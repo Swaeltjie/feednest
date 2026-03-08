@@ -1,15 +1,79 @@
 package store
 
 import (
+	"database/sql"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
 	"github.com/feednest/backend/internal/models"
 )
+
+// WPM cache: stores per-user words-per-minute with a 5-minute TTL.
+var (
+	wpmCache   = make(map[int64]cachedWPM)
+	wpmCacheMu sync.RWMutex
+)
+
+type cachedWPM struct {
+	value     float64
+	expiresAt time.Time
+}
+
+// GetUserWPM calculates the user's average reading speed in words per minute
+// based on their reading_events history. Returns 200.0 (default) if there are
+// fewer than 5 qualifying data points. The result is clamped to [100, 600] WPM
+// and cached for 5 minutes.
+func (q *Queries) GetUserWPM(userID int64) float64 {
+	const defaultWPM = 200.0
+
+	// Check cache first
+	wpmCacheMu.RLock()
+	if cached, ok := wpmCache[userID]; ok && time.Now().Before(cached.expiresAt) {
+		wpmCacheMu.RUnlock()
+		return cached.value
+	}
+	wpmCacheMu.RUnlock()
+
+	var avgWPM sql.NullFloat64
+	var cnt int
+	err := q.db.QueryRow(`
+		SELECT AVG(a.word_count * 60.0 / re.duration_seconds) as avg_wpm, COUNT(*) as cnt
+		FROM reading_events re
+		JOIN articles a ON re.article_id = a.id
+		JOIN feeds f ON a.feed_id = f.id
+		WHERE f.user_id = ?
+		  AND re.event_type = 'read'
+		  AND re.duration_seconds >= 15
+		  AND re.duration_seconds <= 1800
+		  AND a.word_count >= 50`, userID).Scan(&avgWPM, &cnt)
+	if err != nil || cnt < 5 || !avgWPM.Valid {
+		q.cacheWPM(userID, defaultWPM)
+		return defaultWPM
+	}
+
+	wpm := avgWPM.Float64
+	// Clamp to reasonable human range
+	if wpm < 100 {
+		wpm = 100
+	} else if wpm > 600 {
+		wpm = 600
+	}
+
+	q.cacheWPM(userID, wpm)
+	return wpm
+}
+
+func (q *Queries) cacheWPM(userID int64, wpm float64) {
+	wpmCacheMu.Lock()
+	wpmCache[userID] = cachedWPM{value: wpm, expiresAt: time.Now().Add(5 * time.Minute)}
+	wpmCacheMu.Unlock()
+}
 
 var htmlTagRe = regexp.MustCompile(`<[^>]*>`)
 
@@ -135,6 +199,13 @@ func (q *Queries) GetArticle(id, userID int64) (*models.Article, error) {
 	if isSnippetBlocked(a.ContentRaw) {
 		a.ContentRaw = ""
 	}
+
+	// Override reading_time with personalized WPM
+	userWPM := q.GetUserWPM(userID)
+	if a.WordCount > 0 {
+		a.ReadingTime = int(math.Ceil(float64(a.WordCount) / userWPM))
+	}
+
 	return &a, nil
 }
 
@@ -282,6 +353,14 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
+	}
+
+	// Override reading_time with personalized WPM
+	userWPM := q.GetUserWPM(userID)
+	for i := range articles {
+		if articles[i].WordCount > 0 {
+			articles[i].ReadingTime = int(math.Ceil(float64(articles[i].WordCount) / userWPM))
+		}
 	}
 
 	// Post-filter regex hide rules

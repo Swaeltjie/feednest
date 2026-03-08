@@ -203,6 +203,7 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		settingsH := handlers.NewSettingsHandler(queries)
 		r.Get("/api/settings", settingsH.Get)
 		r.Put("/api/settings", settingsH.Update)
+		r.Get("/api/settings/wpm", settingsH.GetWPM)
 
 		rulesH := handlers.NewRulesHandler(queries)
 		r.Get("/api/rules", rulesH.List)

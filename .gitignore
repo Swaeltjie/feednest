@@ -44,5 +44,8 @@ Desktop.ini
 # Docker
 *.log
 
+# Plans / design docs
+docs/plans/
+
 # Images / screenshots (not part of the app)
 icons.png

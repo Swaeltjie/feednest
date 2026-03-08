@@ -152,10 +152,14 @@ When making changes that warrant a new release:
 3. **Commit and push** all changes to `main`
 4. **Tag the release** — `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin vX.Y.Z`
 5. **Create GitHub release** — `gh release create vX.Y.Z --title "vX.Y.Z" --notes-file CHANGELOG_EXCERPT.md` (or use changelog content)
-6. **Build Docker images** — Tag as both version and `latest`:
+6. **Build Docker images** — Tag as both version and `latest`, always include OCI labels to link packages to the repo:
    ```bash
-   docker build -t ghcr.io/swaeltjie/feednest-backend:X.Y.Z -t ghcr.io/swaeltjie/feednest-backend:latest ./backend
-   docker build -t ghcr.io/swaeltjie/feednest-frontend:X.Y.Z -t ghcr.io/swaeltjie/feednest-frontend:latest ./frontend
+   docker build \
+     --label "org.opencontainers.image.source=https://github.com/Swaeltjie/feednest" \
+     -t ghcr.io/swaeltjie/feednest-backend:X.Y.Z -t ghcr.io/swaeltjie/feednest-backend:latest ./backend
+   docker build \
+     --label "org.opencontainers.image.source=https://github.com/Swaeltjie/feednest" \
+     -t ghcr.io/swaeltjie/feednest-frontend:X.Y.Z -t ghcr.io/swaeltjie/feednest-frontend:latest ./frontend
    ```
 7. **Push Docker images** — Push both version and latest tags:
    ```bash

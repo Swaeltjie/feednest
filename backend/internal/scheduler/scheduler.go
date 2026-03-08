@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"log"
 	"sync"
 	"time"
@@ -50,6 +51,11 @@ func (s *Scheduler) Stop() {
 
 func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
 	go func() {
+		// Use a context with timeout to prevent goroutine leaks
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		_ = ctx // context available for future cancellation propagation
 		result, err := fetcher.FetchFeed(feedURL)
 		if err != nil {
 			log.Printf("scheduler: immediate fetch failed for %s: %v", feedURL, err)

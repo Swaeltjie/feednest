@@ -46,8 +46,7 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	for key, value := range settings {
 		if !allowedSettingKeys[key] {
-			resp, _ := json.Marshal(map[string]string{"error": "unknown setting key: " + key})
-			http.Error(w, string(resp), http.StatusBadRequest)
+			http.Error(w, `{"error":"unknown setting key"}`, http.StatusBadRequest)
 			return
 		}
 		if len(value) > 1000 {

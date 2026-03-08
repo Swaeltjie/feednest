@@ -118,19 +118,37 @@ function createArticlesStore() {
 		},
 
 		async toggleRead(id: number, isRead: boolean) {
-			await api.put(`/api/articles/${id}`, { is_read: isRead });
+			// Optimistic update with rollback on failure
 			update((s) => ({
 				...s,
 				articles: s.articles.map((a) => (a.id === id ? { ...a, is_read: isRead } : a)),
 			}));
+			try {
+				await api.put(`/api/articles/${id}`, { is_read: isRead });
+			} catch {
+				// Rollback on failure
+				update((s) => ({
+					...s,
+					articles: s.articles.map((a) => (a.id === id ? { ...a, is_read: !isRead } : a)),
+				}));
+			}
 		},
 
 		async toggleStar(id: number, isStarred: boolean) {
-			await api.put(`/api/articles/${id}`, { is_starred: isStarred });
+			// Optimistic update with rollback on failure
 			update((s) => ({
 				...s,
 				articles: s.articles.map((a) => (a.id === id ? { ...a, is_starred: isStarred } : a)),
 			}));
+			try {
+				await api.put(`/api/articles/${id}`, { is_starred: isStarred });
+			} catch {
+				// Rollback on failure
+				update((s) => ({
+					...s,
+					articles: s.articles.map((a) => (a.id === id ? { ...a, is_starred: !isStarred } : a)),
+				}));
+			}
 		},
 
 		async dismiss(id: number) {

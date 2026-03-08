@@ -69,6 +69,7 @@ async function refreshTokenFn(): Promise<boolean> {
 }
 
 async function doRefresh(): Promise<boolean> {
+	if (typeof localStorage === 'undefined') return false;
 	const refreshTok = localStorage.getItem('feednest_refresh_token');
 	if (!refreshTok) return false;
 

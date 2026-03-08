@@ -50,11 +50,19 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if feedID := r.URL.Query().Get("feed"); feedID != "" {
-		id, _ := strconv.ParseInt(feedID, 10, 64)
+		id, err := strconv.ParseInt(feedID, 10, 64)
+		if err != nil {
+			http.Error(w, `{"error":"invalid feed id"}`, http.StatusBadRequest)
+			return
+		}
 		filter.FeedID = &id
 	}
 	if catID := r.URL.Query().Get("category"); catID != "" {
-		id, _ := strconv.ParseInt(catID, 10, 64)
+		id, err := strconv.ParseInt(catID, 10, 64)
+		if err != nil {
+			http.Error(w, `{"error":"invalid category id"}`, http.StatusBadRequest)
+			return
+		}
 		filter.CategoryID = &id
 	}
 	if search := r.URL.Query().Get("search"); search != "" {
@@ -172,8 +180,18 @@ func (h *ArticleHandler) Bulk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.ArticleIDs) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if len(req.ArticleIDs) > 500 {
 		http.Error(w, `{"error":"too many article IDs, max 500"}`, http.StatusBadRequest)
+		return
+	}
+
+	validActions := map[string]bool{"mark_read": true, "mark_unread": true, "star": true, "unstar": true}
+	if !validActions[req.Action] {
+		http.Error(w, `{"error":"invalid action"}`, http.StatusBadRequest)
 		return
 	}
 

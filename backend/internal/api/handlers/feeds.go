@@ -57,6 +57,14 @@ func (h *FeedHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Validate category ownership if category_id was provided
+	if req.CategoryID != nil {
+		if _, err := h.store.GetCategory(*req.CategoryID, userID); err != nil {
+			http.Error(w, `{"error":"category not found"}`, http.StatusBadRequest)
+			return
+		}
+	}
+
 	feed, err := h.store.CreateFeed(userID, req.URL, "", "", "", req.CategoryID)
 	if err != nil {
 		http.Error(w, `{"error":"failed to create feed or URL already exists"}`, http.StatusConflict)

@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -13,6 +15,83 @@ import (
 	"github.com/feednest/backend/internal/scheduler"
 	"github.com/feednest/backend/internal/store"
 )
+
+// rateLimiter implements a simple per-IP rate limiter for auth endpoints.
+type rateLimiter struct {
+	mu       sync.Mutex
+	attempts map[string][]time.Time
+	window   time.Duration
+	max      int
+}
+
+func newRateLimiter(window time.Duration, max int) *rateLimiter {
+	rl := &rateLimiter{
+		attempts: make(map[string][]time.Time),
+		window:   window,
+		max:      max,
+	}
+	go rl.cleanup()
+	return rl
+}
+
+func (rl *rateLimiter) cleanup() {
+	for {
+		time.Sleep(rl.window)
+		rl.mu.Lock()
+		now := time.Now()
+		for ip, times := range rl.attempts {
+			// Use a fresh slice to allow the old underlying array to be GC'd
+			var valid []time.Time
+			for _, t := range times {
+				if now.Sub(t) < rl.window {
+					valid = append(valid, t)
+				}
+			}
+			if len(valid) == 0 {
+				delete(rl.attempts, ip)
+			} else {
+				rl.attempts[ip] = valid
+			}
+		}
+		rl.mu.Unlock()
+	}
+}
+
+func (rl *rateLimiter) allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	var valid []time.Time
+	for _, t := range rl.attempts[ip] {
+		if now.Sub(t) < rl.window {
+			valid = append(valid, t)
+		}
+	}
+	if len(valid) >= rl.max {
+		rl.attempts[ip] = valid
+		return false
+	}
+	rl.attempts[ip] = append(valid, now)
+	return true
+}
+
+func rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ip := r.RemoteAddr
+			if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+				ip = strings.SplitN(fwd, ",", 2)[0]
+				ip = strings.TrimSpace(ip)
+			}
+			if !rl.allow(ip) {
+				http.Error(w, `{"error":"too many requests, please try again later"}`, http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
 
 func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Scheduler) http.Handler {
 	r := chi.NewRouter()
@@ -26,6 +105,8 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.Header().Set("X-Frame-Options", "DENY")
 			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+			w.Header().Set("X-Permitted-Cross-Domain-Policies", "none")
 			next.ServeHTTP(w, r)
 		})
 	})
@@ -62,10 +143,16 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 
 	auth := NewAuthHandler(queries, jwtSecret)
 
+	// Rate limiter for auth endpoints: 10 attempts per minute per IP
+	authRL := newRateLimiter(1*time.Minute, 10)
+
 	// Public routes
-	r.Post("/api/auth/register", auth.Register)
-	r.Post("/api/auth/login", auth.Login)
-	r.Post("/api/auth/refresh", auth.Refresh)
+	r.Group(func(r chi.Router) {
+		r.Use(rateLimitMiddleware(authRL))
+		r.Post("/api/auth/register", auth.Register)
+		r.Post("/api/auth/login", auth.Login)
+		r.Post("/api/auth/refresh", auth.Refresh)
+	})
 	r.Get("/api/auth/user-count", auth.UserCount)
 
 	// Protected routes

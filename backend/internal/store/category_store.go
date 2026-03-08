@@ -1,6 +1,10 @@
 package store
 
-import "github.com/feednest/backend/internal/models"
+import (
+	"strings"
+
+	"github.com/feednest/backend/internal/models"
+)
 
 func (q *Queries) CreateCategory(userID int64, name string, position int) (*models.Category, error) {
 	result, err := q.db.Exec(
@@ -54,17 +58,26 @@ func (q *Queries) ListCategories(userID int64) ([]models.Category, error) {
 }
 
 func (q *Queries) UpdateCategory(id, userID int64, name *string, position *int) error {
+	var setClauses []string
+	var args []interface{}
+
 	if name != nil {
-		if _, err := q.db.Exec("UPDATE categories SET name = ? WHERE id = ? AND user_id = ?", *name, id, userID); err != nil {
-			return err
-		}
+		setClauses = append(setClauses, "name = ?")
+		args = append(args, *name)
 	}
 	if position != nil {
-		if _, err := q.db.Exec("UPDATE categories SET position = ? WHERE id = ? AND user_id = ?", *position, id, userID); err != nil {
-			return err
-		}
+		setClauses = append(setClauses, "position = ?")
+		args = append(args, *position)
 	}
-	return nil
+
+	if len(setClauses) == 0 {
+		return nil
+	}
+
+	query := "UPDATE categories SET " + strings.Join(setClauses, ", ") + " WHERE id = ? AND user_id = ?"
+	args = append(args, id, userID)
+	_, err := q.db.Exec(query, args...)
+	return err
 }
 
 func (q *Queries) DeleteCategory(id, userID int64) error {

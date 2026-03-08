@@ -135,21 +135,29 @@ func (h *OPMLHandler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Pre-load existing categories to avoid N+1 queries
+	existingCats, err := h.store.ListCategories(userID)
+	if err != nil {
+		http.Error(w, `{"error":"failed to load categories"}`, http.StatusInternalServerError)
+		return
+	}
+	catCache := make(map[string]int64)
+	for _, c := range existingCats {
+		catCache[c.Name] = c.ID
+	}
+
 	imported := 0
 	for _, f := range feeds {
 		var categoryID *int64
 		if f.Category != "" {
-			cat, err := h.store.CreateCategory(userID, f.Category, 0)
-			if err != nil {
-				cats, _ := h.store.ListCategories(userID)
-				for _, c := range cats {
-					if c.Name == f.Category {
-						categoryID = &c.ID
-						break
-					}
-				}
+			if id, ok := catCache[f.Category]; ok {
+				categoryID = &id
 			} else {
-				categoryID = &cat.ID
+				cat, err := h.store.CreateCategory(userID, f.Category, 0)
+				if err == nil {
+					categoryID = &cat.ID
+					catCache[f.Category] = cat.ID
+				}
 			}
 		}
 
@@ -175,7 +183,11 @@ func (h *OPMLHandler) Export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cats, _ := h.store.ListCategories(userID)
+	cats, err := h.store.ListCategories(userID)
+	if err != nil {
+		http.Error(w, `{"error":"failed to list categories"}`, http.StatusInternalServerError)
+		return
+	}
 	catMap := make(map[int64]string)
 	for _, c := range cats {
 		catMap[c.ID] = c.Name

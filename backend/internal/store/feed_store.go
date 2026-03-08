@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strings"
 	"time"
 
 	"github.com/feednest/backend/internal/models"
@@ -72,22 +73,30 @@ func (q *Queries) GetFeed(id, userID int64) (*models.Feed, error) {
 }
 
 func (q *Queries) UpdateFeed(id, userID int64, req *models.UpdateFeedRequest) error {
+	var setClauses []string
+	var args []interface{}
+
 	if req.Title != nil {
-		if _, err := q.db.Exec("UPDATE feeds SET title = ? WHERE id = ? AND user_id = ?", *req.Title, id, userID); err != nil {
-			return err
-		}
+		setClauses = append(setClauses, "title = ?")
+		args = append(args, *req.Title)
 	}
 	if req.CategoryID != nil {
-		if _, err := q.db.Exec("UPDATE feeds SET category_id = ? WHERE id = ? AND user_id = ?", *req.CategoryID, id, userID); err != nil {
-			return err
-		}
+		setClauses = append(setClauses, "category_id = ?")
+		args = append(args, *req.CategoryID)
 	}
 	if req.FetchInterval != nil {
-		if _, err := q.db.Exec("UPDATE feeds SET fetch_interval = ? WHERE id = ? AND user_id = ?", *req.FetchInterval, id, userID); err != nil {
-			return err
-		}
+		setClauses = append(setClauses, "fetch_interval = ?")
+		args = append(args, *req.FetchInterval)
 	}
-	return nil
+
+	if len(setClauses) == 0 {
+		return nil
+	}
+
+	query := "UPDATE feeds SET " + strings.Join(setClauses, ", ") + " WHERE id = ? AND user_id = ?"
+	args = append(args, id, userID)
+	_, err := q.db.Exec(query, args...)
+	return err
 }
 
 func (q *Queries) UpdateFeedLastFetched(id int64) error {
@@ -152,20 +161,29 @@ func (q *Queries) UpdateFeedMetadata(id int64, update *FeedMetadataUpdate) error
 	if update == nil {
 		return nil
 	}
+
+	var setClauses []string
+	var args []interface{}
+
 	if update.Title != nil {
-		if _, err := q.db.Exec("UPDATE feeds SET title = ? WHERE id = ?", *update.Title, id); err != nil {
-			return err
-		}
+		setClauses = append(setClauses, "title = ?")
+		args = append(args, *update.Title)
 	}
 	if update.SiteURL != nil {
-		if _, err := q.db.Exec("UPDATE feeds SET site_url = ? WHERE id = ?", *update.SiteURL, id); err != nil {
-			return err
-		}
+		setClauses = append(setClauses, "site_url = ?")
+		args = append(args, *update.SiteURL)
 	}
 	if update.IconURL != nil {
-		if _, err := q.db.Exec("UPDATE feeds SET icon_url = ? WHERE id = ?", *update.IconURL, id); err != nil {
-			return err
-		}
+		setClauses = append(setClauses, "icon_url = ?")
+		args = append(args, *update.IconURL)
 	}
-	return nil
+
+	if len(setClauses) == 0 {
+		return nil
+	}
+
+	query := "UPDATE feeds SET " + strings.Join(setClauses, ", ") + " WHERE id = ?"
+	args = append(args, id)
+	_, err := q.db.Exec(query, args...)
+	return err
 }

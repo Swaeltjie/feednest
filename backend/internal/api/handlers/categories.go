@@ -75,6 +75,11 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.Name) > 255 {
+		http.Error(w, `{"error":"name must not exceed 255 characters"}`, http.StatusBadRequest)
+		return
+	}
+
 	if err := h.store.UpdateCategory(id, userID, req.Name, req.Position); err != nil {
 		http.Error(w, `{"error":"failed to update category"}`, http.StatusInternalServerError)
 		return

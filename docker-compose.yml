@@ -9,7 +9,7 @@ services:
       - DB_PATH=/data/feednest.db
       - JWT_SECRET=${JWT_SECRET:-}
       - PORT=8080
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,https://feednest.byteden.cc}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
       interval: 30s
@@ -23,7 +23,7 @@ services:
       - "3000:3000"
     environment:
       - BACKEND_URL=http://backend:8080
-      - ORIGIN=${ORIGIN:-https://feednest.byteden.cc}
+      - ORIGIN=${ORIGIN:?Set ORIGIN to your public URL e.g. https://feeds.example.com}
       - PORT=3000
     depends_on:
       backend:

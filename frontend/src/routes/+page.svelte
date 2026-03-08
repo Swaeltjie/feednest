@@ -57,6 +57,8 @@
 	let headerCompact = $derived(scrollY > 80);
 	let focusMode = $state(false);
 	let sentinelEl: HTMLElement | undefined = $state();
+	let showCatchUpBanner = $state(false);
+	let catchUpCount = $state(0);
 
 	function articleAgeOpacity(article: { is_read: boolean; published_at?: string | null }): number {
 		if (article.is_read) return 1; // read articles already have their own opacity
@@ -494,6 +496,37 @@
 		return { count: arts.length, minutes: totalMin };
 	});
 
+	$effect(() => {
+		if ($articles.articles.length > 0 && !openArticleId) {
+			const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+			const oldUnread = $articles.articles.filter(
+				a => !a.is_read && a.published_at && new Date(a.published_at).getTime() < twoDaysAgo
+			);
+			if (oldUnread.length >= 10) {
+				catchUpCount = oldUnread.length;
+				showCatchUpBanner = true;
+			} else {
+				showCatchUpBanner = false;
+			}
+		}
+	});
+
+	async function handleCatchUp(strategy: 'older_than' | 'keep_newest', value?: string, count?: number) {
+		try {
+			const body: Record<string, unknown> = { strategy };
+			if (strategy === 'older_than') body.value = value || '2d';
+			if (strategy === 'keep_newest') body.count = count || 20;
+			if (activeFeedId) body.feed_id = activeFeedId;
+			if (activeCategoryId) body.category_id = activeCategoryId;
+			await api.post<{ affected: number }>('/api/articles/catch-up', body);
+			showCatchUpBanner = false;
+			articles.load(currentFilters);
+			feeds.load();
+		} catch (err) {
+			console.error('Catch-up failed:', err);
+		}
+	}
+
 	let pageTitle = $derived.by(() => {
 		if (sidebarView === 'starred') return 'Starred';
 		if (sidebarView === 'today') return 'Today';
@@ -717,6 +750,46 @@
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
 				<span>{sessionEstimate.count} articles, ~{sessionEstimate.minutes} min of reading</span>
+			</div>
+		{/if}
+
+		{#if showCatchUpBanner && !openArticleId}
+			<div class="mx-4 mb-4 p-4 rounded-2xl glass border border-[var(--color-border)] fade-in-up">
+				<div class="flex items-start gap-3">
+					<div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+						<svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<div class="flex-1 min-w-0">
+						<p class="text-sm font-medium text-[var(--color-text-primary)]">
+							You have {catchUpCount} unread articles older than 2 days
+						</p>
+						<p class="text-xs text-[var(--color-text-tertiary)] mt-0.5">
+							It's OK to let go. You can always search for them later.
+						</p>
+						<div class="flex flex-wrap gap-2 mt-3">
+							<button
+								onclick={() => handleCatchUp('keep_newest', undefined, 20)}
+								class="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
+							>
+								Keep newest 20
+							</button>
+							<button
+								onclick={() => handleCatchUp('older_than', '2d')}
+								class="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-elevated)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] transition-colors"
+							>
+								Clear older than 2 days
+							</button>
+							<button
+								onclick={() => showCatchUpBanner = false}
+								class="px-3 py-1.5 text-xs font-medium rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
+							>
+								Dismiss
+							</button>
+						</div>
+					</div>
+				</div>
 			</div>
 		{/if}
 

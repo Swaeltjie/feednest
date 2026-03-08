@@ -24,6 +24,7 @@ var allowedSettingKeys = map[string]bool{
 	"reader_font_size": true, "reader_font_family": true,
 	"reader_line_height": true, "reader_content_width": true,
 	"calm_mode": true, "auto_mark_read_scroll": true,
+	"infinite_scroll": true,
 }
 
 func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {

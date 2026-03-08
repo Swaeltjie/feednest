@@ -325,7 +325,7 @@
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
 							</svg>
 							<span class="text-xs font-semibold uppercase tracking-wider truncate
-								{isActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-tertiary)]'}">
+								{isActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-tertiary)]'}" title={category.name}>
 								{category.name}
 							</span>
 						</span>
@@ -361,7 +361,7 @@
 											{feed.title?.charAt(0)?.toUpperCase() || '?'}
 										</span>
 									{/if}
-									<span class="truncate">{feed.title}</span>
+									<span class="truncate" title={feed.title}>{feed.title}</span>
 								</span>
 								{#if feed.last_error}
 									<span
@@ -415,7 +415,7 @@
 									{feed.title?.charAt(0)?.toUpperCase() || '?'}
 								</span>
 							{/if}
-							<span class="truncate">{feed.title}</span>
+							<span class="truncate" title={feed.title}>{feed.title}</span>
 						</span>
 						{#if feed.last_error}
 							<span
@@ -499,6 +499,22 @@
 								<span
 									class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200
 										{$settings.autoMarkReadOnScroll ? 'translate-x-4' : 'translate-x-0'}"
+								></span>
+							</button>
+						</label>
+						<label class="flex items-center justify-between cursor-pointer">
+							<span class="text-xs text-[var(--color-text-secondary)]">Infinite scroll</span>
+							<button
+								onclick={() => settings.setInfiniteScroll(!$settings.infiniteScroll)}
+								class="relative w-9 h-5 rounded-full transition-colors duration-200
+									{$settings.infiniteScroll ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'}"
+								role="switch"
+								aria-checked={$settings.infiniteScroll}
+								aria-label="Toggle infinite scroll"
+							>
+								<span
+									class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200
+										{$settings.infiniteScroll ? 'translate-x-4' : 'translate-x-0'}"
 								></span>
 							</button>
 						</label>

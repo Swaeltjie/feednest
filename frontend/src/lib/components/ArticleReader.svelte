@@ -261,8 +261,8 @@
 						onclick={handleStar}
 						class="p-2 rounded-lg transition-all {starAnimating ? 'star-bounce' : ''}
 							{article.is_starred
-								? 'text-yellow-500 bg-yellow-500/10'
-								: 'text-[var(--color-text-tertiary)] hover:text-yellow-500 hover:bg-[var(--color-elevated)]'}"
+								? 'text-yellow-400 bg-yellow-400/10'
+								: 'text-[var(--color-text-tertiary)] hover:text-yellow-400 hover:bg-[var(--color-elevated)]'}"
 						title={article.is_starred ? 'Unstar' : 'Star'}
 					>
 						<svg class="w-5 h-5" viewBox="0 0 24 24" fill={article.is_starred ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2">
@@ -344,7 +344,7 @@
 					{/if}
 
 					{#if article.reading_time}
-						<span>{article.reading_time} min read</span>
+						<span>{article.reading_time} min</span>
 					{/if}
 				</div>
 

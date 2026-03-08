@@ -15,6 +15,7 @@ interface SettingsState {
 	readerContentWidth: ReaderContentWidth;
 	calmMode: boolean;
 	autoMarkReadOnScroll: boolean;
+	infiniteScroll: boolean;
 }
 
 export const READER_FONT_SIZE_MAP: Record<ReaderFontSize, string> = {
@@ -56,6 +57,7 @@ function createSettingsStore() {
 		readerContentWidth: (ls('feednest_reader_content_width') as ReaderContentWidth) || 'medium',
 		calmMode: ls('feednest_calm_mode') === 'true',
 		autoMarkReadOnScroll: ls('feednest_auto_mark_read_scroll') === 'true',
+		infiniteScroll: ls('feednest_infinite_scroll') !== 'false',
 	};
 
 	const { subscribe, update } = writable<SettingsState>(initial);
@@ -119,6 +121,12 @@ function createSettingsStore() {
 			update((s) => ({ ...s, autoMarkReadOnScroll: enabled }));
 			persist('feednest_auto_mark_read_scroll', String(enabled));
 			apiPersist('auto_mark_read_scroll', String(enabled));
+		},
+
+		setInfiniteScroll(enabled: boolean) {
+			update((s) => ({ ...s, infiniteScroll: enabled }));
+			persist('feednest_infinite_scroll', String(enabled));
+			apiPersist('infinite_scroll', String(enabled));
 		},
 	};
 }

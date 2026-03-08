@@ -408,7 +408,7 @@
 	});
 
 	$effect(() => {
-		if (!sentinelEl) return;
+		if (!sentinelEl || !$settings.infiniteScroll) return;
 		const observer = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting && !$articles.loading && !$articles.loadingMore && $articles.articles.length < $articles.total) {
@@ -473,6 +473,14 @@
 			}
 			timers.clear();
 		};
+	});
+
+	let sessionEstimate = $derived.by(() => {
+		if (sidebarView !== 'today' && sidebarView !== 'long_reads') return null;
+		const arts = $articles.articles;
+		if (arts.length === 0) return null;
+		const totalMin = arts.reduce((sum, a) => sum + (a.reading_time || 0), 0);
+		return { count: arts.length, minutes: totalMin };
 	});
 
 	let pageTitle = $derived.by(() => {
@@ -692,6 +700,15 @@
 			</div>
 		</header>
 
+		{#if sessionEstimate && !openArticleId}
+			<div class="px-4 py-2 text-xs text-[var(--color-text-tertiary)] border-b border-[var(--color-border)] flex items-center gap-2" style="background: var(--color-card);">
+				<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+				</svg>
+				<span>{sessionEstimate.count} articles, ~{sessionEstimate.minutes} min of reading</span>
+			</div>
+		{/if}
+
 		<!-- Content area: list + optional reading pane -->
 		<div class="flex-1 flex overflow-hidden">
 			<!-- Article list pane -->
@@ -786,14 +803,30 @@
 						{/if}
 
 						{#if $articles.articles.length < $articles.total}
-							<div bind:this={sentinelEl} class="flex items-center justify-center py-6">
-								{#if $articles.loadingMore}
-									<div class="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin"></div>
-								{/if}
-							</div>
+							{#if $settings.infiniteScroll}
+								<div bind:this={sentinelEl} class="flex items-center justify-center py-6">
+									{#if $articles.loadingMore}
+										<div class="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin"></div>
+									{/if}
+								</div>
+							{:else}
+								<div class="flex flex-col items-center gap-2 py-6">
+									<button
+										onclick={() => articles.loadMore(currentFilters)}
+										disabled={$articles.loadingMore}
+										class="px-5 py-2.5 text-sm font-medium rounded-xl border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)] transition-all disabled:opacity-50"
+									>
+										{#if $articles.loadingMore}
+											Loading...
+										{:else}
+											Load more ({$articles.total - $articles.articles.length} remaining)
+										{/if}
+									</button>
+								</div>
+							{/if}
 						{:else if $articles.articles.length > 0}
 							<div class="text-center py-4 text-sm text-[var(--color-text-tertiary)]">
-								Showing all {$articles.total} articles
+								You've seen all {$articles.total} articles
 							</div>
 						{/if}
 					{/if}

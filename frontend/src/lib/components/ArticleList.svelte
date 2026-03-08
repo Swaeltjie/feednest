@@ -62,7 +62,8 @@
 	class="group flex items-start gap-4 px-4 py-3.5 transition-all duration-200 spring-in
 		border-b border-[var(--color-border)]
 		hover:bg-[var(--color-elevated)] hover:shadow-md
-		{article.is_read ? 'opacity-60 hover:opacity-90' : ''}
+		transition-opacity duration-400
+		{article.is_read ? 'opacity-60 hover:opacity-90' : 'opacity-100'}
 		{selected ? 'bg-[var(--color-accent-glow)] ring-1 ring-inset ring-[var(--color-accent)]/30' : ''}"
 	style="view-transition-name: article-{article.id}; animation-delay: {index * 30}ms; border-left: 3px solid {feedAccentColor || 'transparent'};"
 >
@@ -116,8 +117,8 @@
 		aria-label={article.is_starred ? 'Unstar' : 'Star'}
 		class="flex-shrink-0 p-1.5 rounded-lg transition-all
 			{article.is_starred
-				? 'text-yellow-500 hover:text-yellow-400'
-				: 'text-[var(--color-text-tertiary)] hover:text-yellow-500 opacity-0 group-hover:opacity-100'}
+				? 'text-yellow-400 hover:text-yellow-300'
+				: 'text-[var(--color-text-tertiary)] hover:text-yellow-400 opacity-0 group-hover:opacity-100'}
 			{starAnimating ? 'star-bounce' : ''}"
 	>
 		<svg class="w-4 h-4" viewBox="0 0 24 24" fill={article.is_starred ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2">

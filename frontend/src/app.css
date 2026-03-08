@@ -32,6 +32,18 @@
   --color-text-tertiary: #484f58;
 }
 
+/* ─── Dark mode font weight boost - prevents halation on OLED ─── */
+.dark {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.dark body {
+  font-weight: 450;
+}
+.dark .prose {
+  font-weight: 450;
+}
+
 /* ─── Spring motion presets ─── */
 :root {
 	--spring-snappy: cubic-bezier(0.22, 1, 0.36, 1);
@@ -331,6 +343,12 @@ html.theme-transitioning *::after {
 ::selection {
   background: var(--color-accent-glow);
   color: var(--color-text-primary);
+}
+
+/* ─── Micro-interaction: tactile press feedback ─── */
+button:active:not(:disabled) {
+	transform: scale(0.97);
+	transition: transform 50ms ease-out;
 }
 
 /* ─── Mobile sidebar slide-in ─── */

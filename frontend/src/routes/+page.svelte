@@ -58,6 +58,17 @@
 	let focusMode = $state(false);
 	let sentinelEl: HTMLElement | undefined = $state();
 
+	function articleAgeOpacity(article: { is_read: boolean; published_at?: string | null }): number {
+		if (article.is_read) return 1; // read articles already have their own opacity
+		if (!article.published_at) return 1;
+		const ageHours = (Date.now() - new Date(article.published_at).getTime()) / (1000 * 60 * 60);
+		if (ageHours < 24) return 1;
+		if (ageHours < 48) return 0.85;
+		if (ageHours < 72) return 0.7;
+		if (ageHours < 168) return 0.55; // 7 days
+		return 0.4;
+	}
+
 	const FEATURED_COUNT = 3;
 
 	let currentFilters = $derived<ArticleFilters>({
@@ -755,7 +766,7 @@
 						<div style="background: var(--color-card);">
 							{#each $articles.articles as article, i (article.id)}
 								<div data-article-index={i} data-article-id={article.id}>
-									<ArticleList {article} selected={article.id === openArticleId} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
+									<ArticleList {article} selected={article.id === openArticleId} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} ageOpacity={articleAgeOpacity(article)} />
 								</div>
 							{/each}
 						</div>
@@ -766,7 +777,7 @@
 								<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
 									{#each featuredArticles as article, i (article.id)}
 										<div data-article-index={$articles.articles.indexOf(article)} data-article-id={article.id}>
-											<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} />
+											<ArticleCard {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} ageOpacity={articleAgeOpacity(article)} />
 										</div>
 									{/each}
 								</div>
@@ -774,7 +785,7 @@
 							<div style="background: var(--color-card);" class="rounded-t-2xl mx-2 mt-2">
 								{#each listArticles as article, i (article.id)}
 									<div data-article-index={$articles.articles.indexOf(article)} data-article-id={article.id}>
-										<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
+										<ArticleList {article} selected={$articles.articles.indexOf(article) === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} ageOpacity={articleAgeOpacity(article)} />
 									</div>
 								{/each}
 							</div>
@@ -782,7 +793,7 @@
 							<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
 								{#each $articles.articles as article, i (article.id)}
 									<div data-article-index={i} data-article-id={article.id}>
-										<ArticleCard {article} selected={i === selectedIndex} index={i} onOpen={openArticle} />
+										<ArticleCard {article} selected={i === selectedIndex} index={i} onOpen={openArticle} ageOpacity={articleAgeOpacity(article)} />
 									</div>
 								{/each}
 							</div>
@@ -790,7 +801,7 @@
 							<div style="background: var(--color-card);" class="m-2 rounded-2xl overflow-hidden">
 								{#each $articles.articles as article, i (article.id)}
 									<div data-article-index={i} data-article-id={article.id}>
-										<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} />
+										<ArticleList {article} selected={i === selectedIndex} index={i} onOpen={openArticle} onToggleRead={(id, isRead) => { articles.toggleRead(id, isRead); const a = $articles.articles.find(x => x.id === id); if (a) feeds.adjustUnread(a.feed_id, isRead ? -1 : 1); }} onToggleStar={(id, isStarred) => articles.toggleStar(id, isStarred)} ageOpacity={articleAgeOpacity(article)} />
 									</div>
 								{/each}
 							</div>

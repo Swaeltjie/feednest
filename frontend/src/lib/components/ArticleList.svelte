@@ -14,6 +14,7 @@
 		onOpen = (_id: number) => {},
 		onToggleRead,
 		onToggleStar,
+		ageOpacity = 1,
 	}: {
 		article: Article;
 		selected?: boolean;
@@ -21,6 +22,7 @@
 		onOpen?: (id: number) => void;
 		onToggleRead?: (id: number, isRead: boolean) => void;
 		onToggleStar?: (id: number, isStarred: boolean) => void;
+		ageOpacity?: number;
 	} = $props();
 
 	let starAnimating = $state(false);
@@ -63,9 +65,9 @@
 		border-b border-[var(--color-border)]
 		hover:bg-[var(--color-elevated)] hover:shadow-md
 		transition-opacity duration-400 cursor-pointer
-		{article.is_read ? 'opacity-60 hover:opacity-90' : 'opacity-100'}
+		{article.is_read ? 'hover:opacity-90' : ''}
 		{selected ? 'bg-[var(--color-accent-glow)] ring-1 ring-inset ring-[var(--color-accent)]/30' : ''}"
-	style="view-transition-name: article-{article.id}; animation-delay: {index * 30}ms; border-left: 3px solid {feedAccentColor || 'transparent'};"
+	style="view-transition-name: article-{article.id}; animation-delay: {index * 30}ms; border-left: 3px solid {feedAccentColor || 'transparent'}; opacity: {article.is_read ? 0.6 : ageOpacity};"
 >
 	<!-- Thumbnail -->
 	{#if article.thumbnail_url}

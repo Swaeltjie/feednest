@@ -14,6 +14,13 @@ import (
 	"github.com/feednest/backend/internal/models"
 )
 
+// ReadingStats holds weekly reading statistics for a user.
+type ReadingStats struct {
+	ArticlesRead int `json:"articles_read"`
+	TotalMinutes int `json:"total_minutes"`
+	FeedsRead    int `json:"feeds_read"`
+}
+
 // WPM cache: stores per-user words-per-minute with a 5-minute TTL.
 var (
 	wpmCache   = make(map[int64]cachedWPM)
@@ -581,6 +588,26 @@ func (q *Queries) CatchUp(userID int64, strategy string, value string, count int
 	default:
 		return 0, fmt.Errorf("unknown strategy: %s", strategy)
 	}
+}
+
+func (q *Queries) GetWeeklyReadingStats(userID int64) (*ReadingStats, error) {
+	row := q.db.QueryRow(`
+		SELECT
+			COUNT(*) as articles_read,
+			COALESCE(SUM(a.reading_time), 0) as total_minutes,
+			COUNT(DISTINCT a.feed_id) as feeds_read
+		FROM articles a
+		JOIN feeds f ON f.id = a.feed_id AND f.user_id = ?
+		WHERE a.is_read = 1
+		AND a.read_at >= datetime('now', '-7 days')
+	`, userID)
+
+	stats := &ReadingStats{}
+	err := row.Scan(&stats.ArticlesRead, &stats.TotalMinutes, &stats.FeedsRead)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
 }
 
 func (q *Queries) CreateReadingEvent(articleID int64, eventType string, durationSeconds int) error {

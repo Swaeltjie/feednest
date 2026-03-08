@@ -49,6 +49,17 @@ func (h *SettingsHandler) GetWPM(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *SettingsHandler) GetReadingStats(w http.ResponseWriter, r *http.Request) {
+	userID := apiutil.ExtractUserID(r)
+	stats, err := h.store.GetWeeklyReadingStats(userID)
+	if err != nil {
+		http.Error(w, `{"error":"failed to get reading stats"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
+}
+
 func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID := apiutil.ExtractUserID(r)
 	var settings map[string]string

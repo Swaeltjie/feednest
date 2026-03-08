@@ -52,8 +52,6 @@ docker compose up -d
 
 Open **http://localhost:3000**, create your account, and add your first feed. That's it.
 
-> **Tip:** Set `JWT_SECRET` to something secure in your environment before deploying.
-
 <br/>
 
 ## Features
@@ -163,7 +161,6 @@ cd frontend && npm install && npm run dev  # Frontend on :5173 with HMR
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `JWT_SECRET` | `change-me-in-production` | **Set this.** JWT signing key. |
 | `PORT` | `8080` | Backend listen port |
 | `DB_PATH` | `./feednest.db` | SQLite database path |
 | `ORIGIN` | `http://localhost:3000` | SvelteKit origin (CSRF) |

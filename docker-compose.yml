@@ -7,7 +7,7 @@ services:
       - feednest-data:/data
     environment:
       - DB_PATH=/data/feednest.db
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:-}
       - PORT=8080
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]

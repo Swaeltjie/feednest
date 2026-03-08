@@ -38,6 +38,9 @@
 	let contextMenu = $state<{ feed: Feed; x: number; y: number } | null>(null);
 	let categoryContextMenu = $state<{ category: Category; x: number; y: number } | null>(null);
 	let deletingFeedId = $state<number | null>(null);
+	let renamingFeedId = $state<number | null>(null);
+	let renamingCategoryId = $state<number | null>(null);
+	let renameValue = $state('');
 	// Start with all categories collapsed; populated once categories load
 	let collapsedCategories = $state<Set<number>>(new Set());
 	let initializedCollapsed = $state(false);
@@ -109,6 +112,46 @@
 		contextMenu = null;
 		categoryContextMenu = null;
 		showSettings = false;
+	}
+
+	function startRenameFeed(feed: Feed) {
+		contextMenu = null;
+		renameValue = feed.title;
+		renamingFeedId = feed.id;
+	}
+
+	function startRenameCategory(category: Category) {
+		categoryContextMenu = null;
+		renameValue = category.name;
+		renamingCategoryId = category.id;
+	}
+
+	async function commitRename() {
+		const trimmed = renameValue.trim();
+		if (trimmed && renamingFeedId) {
+			await feeds.update(renamingFeedId, { title: trimmed });
+		} else if (trimmed && renamingCategoryId) {
+			await categories.update(renamingCategoryId, { name: trimmed });
+		}
+		renamingFeedId = null;
+		renamingCategoryId = null;
+		renameValue = '';
+	}
+
+	function cancelRename() {
+		renamingFeedId = null;
+		renamingCategoryId = null;
+		renameValue = '';
+	}
+
+	function handleRenameKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			commitRename();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			cancelRename();
+		}
 	}
 
 	async function handleDeleteFeed(feed: Feed) {
@@ -324,10 +367,23 @@
 							<svg class="w-3.5 h-3.5 flex-shrink-0 {isActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-tertiary)]'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
 							</svg>
-							<span class="text-xs font-semibold uppercase tracking-wider truncate
-								{isActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-tertiary)]'}" title={category.name}>
-								{category.name}
-							</span>
+							{#if renamingCategoryId === category.id}
+								<!-- svelte-ignore a11y_autofocus -->
+								<input
+									type="text"
+									bind:value={renameValue}
+									onkeydown={handleRenameKeydown}
+									onblur={commitRename}
+									autofocus
+									class="text-xs font-semibold uppercase tracking-wider bg-transparent border-b border-[var(--color-accent)] outline-none text-[var(--color-text-primary)] w-full"
+									onclick={(e) => e.stopPropagation()}
+								/>
+							{:else}
+								<span class="text-xs font-semibold uppercase tracking-wider truncate
+									{isActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-tertiary)]'}" title={category.name}>
+									{category.name}
+								</span>
+							{/if}
 						</span>
 						{#if !$settings.calmMode && catUnread > 0}
 							<span class="ml-1 flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-full bg-[var(--color-elevated)] text-[var(--color-text-secondary)]">
@@ -361,7 +417,20 @@
 											{feed.title?.charAt(0)?.toUpperCase() || '?'}
 										</span>
 									{/if}
-									<span class="truncate" title={feed.title}>{feed.title}</span>
+									{#if renamingFeedId === feed.id}
+										<!-- svelte-ignore a11y_autofocus -->
+										<input
+											type="text"
+											bind:value={renameValue}
+											onkeydown={handleRenameKeydown}
+											onblur={commitRename}
+											autofocus
+											class="text-sm bg-transparent border-b border-[var(--color-accent)] outline-none text-[var(--color-text-primary)] w-full"
+											onclick={(e) => e.stopPropagation()}
+										/>
+									{:else}
+										<span class="truncate" title={feed.title}>{feed.title}</span>
+									{/if}
 								</span>
 								{#if feed.last_error}
 									<span
@@ -542,6 +611,15 @@
 		style="left: {contextMenu.x}px; top: {contextMenu.y}px; animation-duration: 100ms;"
 	>
 		<button
+			onclick={() => { if (contextMenu) { startRenameFeed(contextMenu.feed); } }}
+			class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] transition-colors"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+			</svg>
+			Rename
+		</button>
+		<button
 			onclick={() => { if (contextMenu) { onMarkFeedRead(contextMenu.feed.id); closeContextMenu(); } }}
 			class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] transition-colors"
 		>
@@ -579,6 +657,15 @@
 		class="fixed z-[100] py-1.5 rounded-xl shadow-2xl min-w-[160px] glass border border-[var(--color-border-hover)] fade-in-up"
 		style="left: {categoryContextMenu.x}px; top: {categoryContextMenu.y}px; animation-duration: 100ms;"
 	>
+		<button
+			onclick={() => { if (categoryContextMenu) { startRenameCategory(categoryContextMenu.category); } }}
+			class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] transition-colors"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+			</svg>
+			Rename
+		</button>
 		<button
 			onclick={() => { if (categoryContextMenu) { onMarkCategoryRead(categoryContextMenu.category.id); closeContextMenu(); } }}
 			class="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] transition-colors"

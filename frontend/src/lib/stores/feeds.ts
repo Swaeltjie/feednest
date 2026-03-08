@@ -69,6 +69,10 @@ function createCategoriesStore() {
 			await api.del(`/api/categories/${id}`);
 			await this.load();
 		},
+		async update(id: number, data: { name?: string; position?: number }) {
+			await api.put(`/api/categories/${id}`, data);
+			await this.load();
+		},
 	};
 }
 

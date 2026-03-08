@@ -1,9 +1,13 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/feednest/backend/internal/api"
@@ -24,7 +28,8 @@ func main() {
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" || jwtSecret == "change-me-in-production" {
-		log.Fatal("FATAL: JWT_SECRET must be set to a strong random value (not the default)")
+		// Auto-generate and persist a secure JWT secret
+		jwtSecret = loadOrGenerateSecret(filepath.Dir(dbPath))
 	}
 
 	db, err := store.NewDB(dbPath)
@@ -43,4 +48,35 @@ func main() {
 
 	log.Printf("FeedNest backend starting on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))
+}
+
+// loadOrGenerateSecret reads a JWT secret from a file in dataDir, or generates
+// a cryptographically secure 256-bit key and persists it for future restarts.
+func loadOrGenerateSecret(dataDir string) string {
+	secretFile := filepath.Join(dataDir, ".jwt_secret")
+
+	if data, err := os.ReadFile(secretFile); err == nil {
+		secret := strings.TrimSpace(string(data))
+		if len(secret) >= 32 {
+			log.Println("JWT_SECRET loaded from", secretFile)
+			return secret
+		}
+	}
+
+	// Generate 32 bytes (256-bit) of cryptographic randomness
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		log.Fatalf("failed to generate JWT secret: %v", err)
+	}
+	secret := hex.EncodeToString(key)
+
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		log.Fatalf("failed to create data directory: %v", err)
+	}
+	if err := os.WriteFile(secretFile, []byte(secret+"\n"), 0o600); err != nil {
+		log.Fatalf("failed to persist JWT secret: %v", err)
+	}
+
+	log.Println("JWT_SECRET auto-generated and saved to", secretFile)
+	return secret
 }

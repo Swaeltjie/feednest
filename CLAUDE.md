@@ -143,5 +143,5 @@ cd frontend && npm run check          # TypeScript + Svelte check
 |----------|---------|-------------|
 | PORT | 8080 | Backend listen port |
 | DB_PATH | ./feednest.db | SQLite database path |
-| JWT_SECRET | change-me-in-production | JWT signing secret |
+| JWT_SECRET | *(auto-generated)* | JWT signing key — auto-generated and persisted if not set |
 | ORIGIN | http://localhost:3000 | SvelteKit origin (CSRF) |

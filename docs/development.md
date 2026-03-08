@@ -57,7 +57,7 @@ feednest/
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `JWT_SECRET` | `change-me-in-production` | JWT signing key |
+| `JWT_SECRET` | *(auto-generated)* | JWT signing key — auto-generated and persisted if not set |
 | `PORT` | `8080` | Backend listen port |
 | `DB_PATH` | `./feednest.db` | SQLite database path |
 | `ORIGIN` | `http://localhost:3000` | SvelteKit origin (CSRF) |

@@ -348,7 +348,7 @@
 				{/if}
 
 				<!-- Article body -->
-				{#if article.content_clean || article.content_raw}
+				{#if article.content_clean}
 					<div
 						class="prose prose-lg dark:prose-invert
 							prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-[var(--color-text-primary)]
@@ -363,7 +363,39 @@
 							line-height: {READER_LINE_HEIGHT_MAP[$settings.readerLineHeight]};
 							max-width: {READER_CONTENT_WIDTH_MAP[$settings.readerContentWidth]}; margin: 0 auto;"
 					>
-						{@html DOMPurify.sanitize(article.content_clean || article.content_raw, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
+						{@html DOMPurify.sanitize(article.content_clean, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
+					</div>
+				{:else if article.content_raw}
+					<!-- RSS summary only — full content extraction failed (bot protection, paywall, etc.) -->
+					<div style="max-width: {READER_CONTENT_WIDTH_MAP[$settings.readerContentWidth]}; margin: 0 auto;">
+						<div
+							class="prose prose-lg dark:prose-invert
+								prose-p:text-[var(--color-text-primary)] prose-li:text-[var(--color-text-primary)]
+								max-w-none mb-6"
+							style="font-size: {READER_FONT_SIZE_MAP[$settings.readerFontSize]};
+								font-family: {READER_FONT_FAMILY_MAP[$settings.readerFontFamily]};
+								line-height: {READER_LINE_HEIGHT_MAP[$settings.readerLineHeight]};"
+						>
+							{@html DOMPurify.sanitize(article.content_raw, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
+						</div>
+						{#if article.url && isSafeUrl(article.url)}
+							<div class="flex flex-col items-center py-8 border-t border-[var(--color-border)]">
+								<p class="text-sm text-[var(--color-text-tertiary)] mb-4">
+									This site doesn't allow full content extraction — only the feed preview is available.
+								</p>
+								<a
+									href={article.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white rounded-xl accent-gradient hover:opacity-90 transition-opacity shadow-lg shadow-blue-500/25"
+								>
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+									</svg>
+									Read Full Article
+								</a>
+							</div>
+						{/if}
 					</div>
 				{:else}
 					<div class="flex flex-col items-center justify-center py-16 text-center">

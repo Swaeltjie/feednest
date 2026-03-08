@@ -31,6 +31,60 @@ export function parallax(node: HTMLElement, options?: { rate?: number }) {
 	};
 }
 
+export function tiltHover(node: HTMLElement) {
+	if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+		return { destroy() {} };
+	}
+
+	const maxTilt = 4;
+	const parent = node.parentElement;
+	if (parent) {
+		parent.style.perspective = '800px';
+	}
+
+	node.style.willChange = 'transform';
+	node.style.transformStyle = 'preserve-3d';
+
+	function onMouseMove(e: MouseEvent) {
+		const rect = node.getBoundingClientRect();
+		const x = (e.clientX - rect.left) / rect.width - 0.5;
+		const y = (e.clientY - rect.top) / rect.height - 0.5;
+		const rotateY = x * maxTilt * 2;
+		const rotateX = -y * maxTilt * 2;
+		node.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+	}
+
+	function onMouseEnter() {
+		node.style.transition = 'none';
+		node.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
+	}
+
+	function onMouseLeave() {
+		node.style.transition = `transform var(--duration-snappy, 0.4s) var(--spring-snappy, ease-out), box-shadow var(--duration-snappy, 0.4s) var(--spring-snappy, ease-out)`;
+		node.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
+		node.style.boxShadow = '';
+	}
+
+	node.addEventListener('mouseenter', onMouseEnter);
+	node.addEventListener('mousemove', onMouseMove);
+	node.addEventListener('mouseleave', onMouseLeave);
+
+	return {
+		destroy() {
+			node.removeEventListener('mouseenter', onMouseEnter);
+			node.removeEventListener('mousemove', onMouseMove);
+			node.removeEventListener('mouseleave', onMouseLeave);
+			node.style.willChange = '';
+			node.style.transformStyle = '';
+			node.style.transform = '';
+			node.style.boxShadow = '';
+			if (parent) {
+				parent.style.perspective = '';
+			}
+		}
+	};
+}
+
 export function magneticHover(node: HTMLElement, options?: { strength?: number }) {
 	const strength = options?.strength ?? 5;
 

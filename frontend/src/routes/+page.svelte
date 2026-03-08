@@ -57,6 +57,51 @@
 	let headerCompact = $derived(scrollY > 80);
 	let focusMode = $state(false);
 	let sentinelEl: HTMLElement | undefined = $state();
+	let articleListEl: HTMLElement | undefined = $state();
+
+	// Pull-to-refresh state
+	let pullStartY = $state(0);
+	let pullDistance = $state(0);
+	let isPulling = $state(false);
+	let isRefreshing = $state(false);
+	const PULL_THRESHOLD = 80;
+
+	function handleTouchStart(e: TouchEvent) {
+		if (articleListEl && articleListEl.scrollTop <= 0 && !openArticleId) {
+			pullStartY = e.touches[0].clientY;
+			isPulling = true;
+		}
+	}
+
+	function handleTouchMove(e: TouchEvent) {
+		if (!isPulling) return;
+		const currentY = e.touches[0].clientY;
+		const diff = currentY - pullStartY;
+		if (diff > 0) {
+			pullDistance = Math.min(diff * 0.5, 120);
+		} else {
+			pullDistance = 0;
+		}
+	}
+
+	async function handleTouchEnd() {
+		if (!isPulling) return;
+		isPulling = false;
+		if (pullDistance >= PULL_THRESHOLD && !isRefreshing) {
+			isRefreshing = true;
+			pullDistance = PULL_THRESHOLD * 0.6;
+			try {
+				refreshCountdown = 300;
+				await feeds.load();
+				await articles.load(currentFilters);
+			} finally {
+				isRefreshing = false;
+				pullDistance = 0;
+			}
+		} else {
+			pullDistance = 0;
+		}
+	}
 
 	function articleAgeOpacity(article: { is_read: boolean; published_at?: string | null }): number {
 		if (article.is_read) return 1; // read articles already have their own opacity
@@ -725,40 +770,114 @@
 		<div class="flex-1 flex overflow-hidden">
 			<!-- Article list pane -->
 			<div
-				class="overflow-y-auto transition-all duration-300
+				bind:this={articleListEl}
+				ontouchstart={handleTouchStart}
+				ontouchmove={handleTouchMove}
+				ontouchend={handleTouchEnd}
+				class="overflow-y-auto transition-all duration-300 relative
 					{openArticleId
 						? focusMode
 							? 'w-0 min-w-0 opacity-0 overflow-hidden'
 							: 'hidden lg:block lg:w-[350px] lg:min-w-[350px] lg:border-r lg:border-[var(--color-border)]'
-						: 'w-full'}"
+						: 'w-full'}
+					{isRefreshing ? 'pull-refreshing' : ''}"
 			>
+				<!-- Pull-to-refresh indicator -->
+				{#if pullDistance > 0 || isRefreshing}
+					<div
+						class="pull-to-refresh-indicator flex items-center justify-center"
+						style="height: {pullDistance}px; opacity: {Math.min(pullDistance / PULL_THRESHOLD, 1)};"
+					>
+						<div class="p-2 rounded-full {pullDistance >= PULL_THRESHOLD ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-tertiary)]'}">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+								style="transform: rotate({Math.min(pullDistance / PULL_THRESHOLD * 180, 180)}deg);">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+							</svg>
+						</div>
+					</div>
+				{/if}
+
 				{#if $articles.loading && !initialized}
 					<SkeletonLoader mode={viewMode} />
 				{:else if $articles.articles.length === 0}
 					<!-- Empty state -->
 					<div class="flex flex-col items-center justify-center py-20 text-center px-4 fade-in-up">
-						<div class="animate-float mb-6">
-							<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
-								<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-								</svg>
-							</div>
-						</div>
-						<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No articles found</h2>
-						<p class="text-sm text-[var(--color-text-secondary)] mb-4">
-							{#if $feeds.length === 0}
-								Add a feed to get started.
-							{:else}
-								Try changing your filters or check back later.
-							{/if}
-						</p>
 						{#if $feeds.length === 0}
+							<div class="animate-float mb-6">
+								<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
+									<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+									</svg>
+								</div>
+							</div>
+							<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No articles found</h2>
+							<p class="text-sm text-[var(--color-text-secondary)] mb-4">Add a feed to get started.</p>
 							<button
 								onclick={openAddFeed}
 								class="px-5 py-2.5 text-sm font-medium text-white rounded-xl accent-gradient hover:opacity-90 transition-opacity shadow-lg shadow-blue-500/25"
 							>
 								Add Your First Feed
 							</button>
+						{:else if debouncedSearch}
+							<div class="animate-float mb-6">
+								<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
+									<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+									</svg>
+								</div>
+							</div>
+							<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No results for &lsquo;{debouncedSearch}&rsquo;</h2>
+							<p class="text-sm text-[var(--color-text-secondary)] mb-4">Try different keywords</p>
+						{:else if sidebarView === 'starred' || filterTab === 'starred'}
+							<div class="animate-float mb-6">
+								<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
+									<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+									</svg>
+								</div>
+							</div>
+							<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No starred articles</h2>
+							<p class="text-sm text-[var(--color-text-secondary)] mb-4">Star articles to save them for later</p>
+						{:else if sidebarView === 'today'}
+							<div class="animate-float mb-6">
+								<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
+									<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+									</svg>
+								</div>
+							</div>
+							<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">Nothing new today</h2>
+							<p class="text-sm text-[var(--color-text-secondary)] mb-4">Check back later or browse all articles</p>
+						{:else if sidebarView === 'long_reads'}
+							<div class="animate-float mb-6">
+								<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
+									<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+									</svg>
+								</div>
+							</div>
+							<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No long reads</h2>
+							<p class="text-sm text-[var(--color-text-secondary)] mb-4">Articles over 10 minutes will appear here</p>
+						{:else if filterTab === 'unread'}
+							<div class="animate-float mb-6">
+								<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
+									<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+									</svg>
+								</div>
+							</div>
+							<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">All caught up!</h2>
+							<p class="text-sm text-[var(--color-text-secondary)] mb-4">You've read everything. Time for a break.</p>
+						{:else}
+							<div class="animate-float mb-6">
+								<div class="w-20 h-20 rounded-2xl accent-gradient flex items-center justify-center shadow-lg">
+									<svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+									</svg>
+								</div>
+							</div>
+							<h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-1">No articles found</h2>
+							<p class="text-sm text-[var(--color-text-secondary)] mb-4">Try changing your filters or check back later.</p>
 						{/if}
 					</div>
 				{:else}
@@ -773,6 +892,8 @@
 						</div>
 					{:else}
 						<!-- Normal view modes when no article open -->
+						{#key `${sidebarView}-${activeFeedId}-${activeCategoryId}-${filterTab}`}
+						<div class="content-fade-in">
 						{#if viewMode === 'hybrid'}
 							{#if featuredArticles.length > 0}
 								<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
@@ -841,6 +962,8 @@
 								You've seen all {$articles.total} articles
 							</div>
 						{/if}
+						</div>
+						{/key}
 					{/if}
 				{/if}
 			</div>

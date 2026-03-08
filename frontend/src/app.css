@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
+/* ─── Web fonts for reader ─── */
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap');
+
 /* ─── Adaptive dark mode layers ─── */
 :root {
   --color-base: #f8f9fa;
@@ -80,8 +83,6 @@
 }
 .glass-card:hover {
   border-color: var(--color-border-hover);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
 }
 .dark .glass-card:hover {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -349,6 +350,26 @@ html.theme-transitioning *::after {
 button:active:not(:disabled) {
 	transform: scale(0.97);
 	transition: transform 50ms ease-out;
+}
+
+/* ─── Pull-to-refresh indicator ─── */
+.pull-to-refresh-indicator {
+	transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+@keyframes spinRefresh {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+.pull-refreshing .pull-to-refresh-indicator svg {
+	animation: spinRefresh 0.8s linear infinite;
+}
+
+/* ─── View transition fade ─── */
+.view-transition {
+	transition: opacity var(--duration-snappy) var(--spring-snappy);
+}
+.view-transition-enter {
+	opacity: 0;
 }
 
 /* ─── Mobile sidebar slide-in ─── */

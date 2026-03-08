@@ -23,7 +23,7 @@ export const READER_FONT_SIZE_MAP: Record<ReaderFontSize, string> = {
 };
 export const READER_FONT_FAMILY_MAP: Record<ReaderFontFamily, string> = {
 	sans: 'ui-sans-serif, system-ui, sans-serif',
-	serif: 'ui-serif, Georgia, Cambria, serif',
+	serif: "'Merriweather', Georgia, Cambria, 'Times New Roman', serif",
 	mono: 'ui-monospace, SFMono-Regular, monospace',
 };
 export const READER_LINE_HEIGHT_MAP: Record<ReaderLineHeight, string> = {

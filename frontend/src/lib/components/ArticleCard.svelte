@@ -4,7 +4,7 @@
 	import { timeAgo } from '$lib/utils/time';
 	import { getFaviconUrl, handleFaviconError } from '$lib/utils/favicon';
 	import { getFeedColor } from '$lib/utils/color';
-	import { magneticHover } from '$lib/utils/parallax';
+	import { tiltHover } from '$lib/utils/parallax';
 	import { blurUp } from '$lib/utils/blurload';
 	import { starBurst } from '$lib/utils/particles';
 
@@ -50,7 +50,7 @@
 <a
 	href="/article/{article.id}"
 	onclick={handleClick}
-	use:magneticHover={{ strength: 5 }}
+	use:tiltHover
 	class="group relative block rounded-2xl overflow-hidden glass-card spring-in"
 	style="view-transition-name: article-{article.id}; animation-delay: {Math.min(index * 40, 600)}ms; min-height: 280px; border-bottom: 2px solid {feedAccentColor || 'transparent'}; opacity: {ageOpacity};"
 	class:ring-2={selected}

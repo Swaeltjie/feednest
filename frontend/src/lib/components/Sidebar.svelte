@@ -4,7 +4,6 @@
 	import { getFaviconUrl, handleFaviconError } from '$lib/utils/favicon';
 	import AnimatedCount from './AnimatedCount.svelte';
 	import { settings } from '$lib/stores/settings';
-	import { api } from '$lib/api/client';
 
 	let {
 		collapsed = false,
@@ -48,14 +47,6 @@
 	let draggedFeed = $state<Feed | null>(null);
 	let dragOverCategoryId = $state<number | null>(null);
 	let dragOverUncategorized = $state(false);
-
-	let readingStats = $state<{ articles_read: number; total_minutes: number; feeds_read: number } | null>(null);
-
-	$effect(() => {
-		api.get<{ articles_read: number; total_minutes: number; feeds_read: number }>('/api/settings/reading-stats')
-			.then(s => { readingStats = s; })
-			.catch(() => {});
-	});
 
 	function toggleCategory(e: Event, categoryId: number) {
 		e.stopPropagation();
@@ -439,18 +430,6 @@
 						{/if}
 					</button>
 				{/each}
-			</div>
-		{/if}
-		{#if readingStats && readingStats.articles_read > 0 && !collapsed}
-			<div class="px-4 py-3 border-t border-[var(--color-border)]">
-				<p class="text-[10px] font-medium text-[var(--color-text-tertiary)] uppercase tracking-wider mb-1.5">This week</p>
-				<div class="flex items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-					<span>{readingStats.articles_read} read</span>
-					<span class="opacity-40">&middot;</span>
-					<span>{readingStats.total_minutes} min</span>
-					<span class="opacity-40">&middot;</span>
-					<span>{readingStats.feeds_read} feeds</span>
-				</div>
 			</div>
 		{/if}
 	</nav>

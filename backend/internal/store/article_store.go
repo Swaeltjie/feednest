@@ -597,15 +597,19 @@ func (q *Queries) CatchUp(userID int64, strategy string, value string, count int
 }
 
 func (q *Queries) GetWeeklyReadingStats(userID int64) (*ReadingStats, error) {
+	// Use reading_events (actual reads with duration > 5s) instead of
+	// read_at timestamps which include bulk mark-all-as-read operations.
 	row := q.db.QueryRow(`
 		SELECT
-			COUNT(*) as articles_read,
-			COALESCE(SUM(a.reading_time), 0) as total_minutes,
+			COUNT(DISTINCT re.article_id) as articles_read,
+			COALESCE(SUM(re.duration_seconds) / 60, 0) as total_minutes,
 			COUNT(DISTINCT a.feed_id) as feeds_read
-		FROM articles a
+		FROM reading_events re
+		JOIN articles a ON a.id = re.article_id
 		JOIN feeds f ON f.id = a.feed_id AND f.user_id = ?
-		WHERE a.is_read = 1
-		AND a.read_at >= datetime('now', '-7 days')
+		WHERE re.event_type = 'read'
+		AND re.duration_seconds > 5
+		AND re.created_at >= datetime('now', '-7 days')
 	`, userID)
 
 	stats := &ReadingStats{}

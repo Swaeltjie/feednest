@@ -57,16 +57,9 @@
 	let headerCompact = $derived(scrollY > 80);
 	let focusMode = $state(false);
 	let sentinelEl: HTMLElement | undefined = $state();
-	let showCatchUpBanner = $state(false);
-	let catchUpCount = $state(0);
 
-	// Session framing state
-	let sessionBudget = $state<number | null>(null);
-	let sessionStartTime = $state<number>(Date.now());
+	// Session tracking state
 	let sessionReadDetails = $state<Map<number, { title: string; readingTime: number; starred: boolean }>>(new Map());
-	let showSessionPrompt = $state(false);
-	let sessionTimeElapsed = $state(0);
-	let sessionPromptShown = $state(false);
 	let showSessionSummary = $state(false);
 	let sessionSummaryData = $state<{
 		articlesRead: number;
@@ -541,27 +534,6 @@
 		};
 	});
 
-	// Session prompt: show when articles first load with enough unread
-	$effect(() => {
-		if (!sessionPromptShown && $articles.articles.length > 0 && !$articles.loading) {
-			const unreadCount = $articles.articles.filter(a => !a.is_read).length;
-			if (unreadCount >= 5) {
-				showSessionPrompt = true;
-			}
-			sessionPromptShown = true;
-		}
-	});
-
-	// Session timer: update elapsed time every 30 seconds
-	$effect(() => {
-		if (sessionBudget === null) return;
-		const interval = setInterval(() => {
-			sessionTimeElapsed = Math.floor((Date.now() - sessionStartTime) / 1000 / 60);
-		}, 30000);
-		sessionTimeElapsed = Math.floor((Date.now() - sessionStartTime) / 1000 / 60);
-		return () => clearInterval(interval);
-	});
-
 	let sessionEstimate = $derived.by(() => {
 		if (sidebarView !== 'today' && sidebarView !== 'long_reads') return null;
 		const arts = $articles.articles;
@@ -569,37 +541,6 @@
 		const totalMin = arts.reduce((sum, a) => sum + (a.reading_time || 0), 0);
 		return { count: arts.length, minutes: totalMin };
 	});
-
-	$effect(() => {
-		if ($articles.articles.length > 0 && !openArticleId) {
-			const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
-			const oldUnread = $articles.articles.filter(
-				a => !a.is_read && a.published_at && new Date(a.published_at).getTime() < twoDaysAgo
-			);
-			if (oldUnread.length >= 10) {
-				catchUpCount = oldUnread.length;
-				showCatchUpBanner = true;
-			} else {
-				showCatchUpBanner = false;
-			}
-		}
-	});
-
-	async function handleCatchUp(strategy: 'older_than' | 'keep_newest', value?: string, count?: number) {
-		try {
-			const body: Record<string, unknown> = { strategy };
-			if (strategy === 'older_than') body.value = value || '2d';
-			if (strategy === 'keep_newest') body.count = count || 20;
-			if (activeFeedId) body.feed_id = activeFeedId;
-			if (activeCategoryId) body.category_id = activeCategoryId;
-			await api.post<{ affected: number }>('/api/articles/catch-up', body);
-			showCatchUpBanner = false;
-			articles.load(currentFilters);
-			feeds.load();
-		} catch (err) {
-			console.error('Catch-up failed:', err);
-		}
-	}
 
 	let pageTitle = $derived.by(() => {
 		if (sidebarView === 'starred') return 'Starred';
@@ -755,16 +696,6 @@
 				</div>
 
 				<div class="flex items-center gap-3">
-					<!-- Session timer -->
-					{#if sessionBudget !== null}
-						<div class="flex items-center gap-1.5 text-xs text-[var(--color-text-tertiary)]" title="Session timer">
-							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-							</svg>
-							<span>{sessionTimeElapsed} / {sessionBudget} min</span>
-						</div>
-					{/if}
-
 					<!-- Refresh countdown -->
 					<button
 						onclick={async () => { refreshCountdown = 300; await feeds.load(); await articles.load(currentFilters); }}
@@ -834,70 +765,6 @@
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
 				<span>{sessionEstimate.count} articles, ~{sessionEstimate.minutes} min of reading</span>
-			</div>
-		{/if}
-
-		{#if sessionBudget !== null && sessionTimeElapsed >= sessionBudget && !openArticleId}
-			<div class="mx-4 mb-3 p-3 rounded-xl bg-[var(--color-accent)]/5 border border-[var(--color-accent)]/20 fade-in-up">
-				<div class="flex items-center justify-between">
-					<p class="text-sm text-[var(--color-text-secondary)]">
-						Your {sessionBudget} minutes are up. You read {sessionReadDetails.size} article{sessionReadDetails.size !== 1 ? 's' : ''}.
-					</p>
-					<div class="flex gap-2">
-						<button
-							onclick={() => { sessionBudget = sessionBudget! + 10; }}
-							class="px-3 py-1 text-xs font-medium rounded-lg text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors"
-						>
-							+10 min
-						</button>
-						<button
-							onclick={() => { sessionBudget = null; }}
-							class="px-3 py-1 text-xs font-medium rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
-						>
-							Done
-						</button>
-					</div>
-				</div>
-			</div>
-		{/if}
-
-		{#if showCatchUpBanner && !openArticleId}
-			<div class="mx-4 mb-4 p-4 rounded-2xl glass border border-[var(--color-border)] fade-in-up">
-				<div class="flex items-start gap-3">
-					<div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-						<svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-						</svg>
-					</div>
-					<div class="flex-1 min-w-0">
-						<p class="text-sm font-medium text-[var(--color-text-primary)]">
-							You have {catchUpCount} unread articles older than 2 days
-						</p>
-						<p class="text-xs text-[var(--color-text-tertiary)] mt-0.5">
-							It's OK to let go. You can always search for them later.
-						</p>
-						<div class="flex flex-wrap gap-2 mt-3">
-							<button
-								onclick={() => handleCatchUp('keep_newest', undefined, 20)}
-								class="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
-							>
-								Keep newest 20
-							</button>
-							<button
-								onclick={() => handleCatchUp('older_than', '2d')}
-								class="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-elevated)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] transition-colors"
-							>
-								Clear older than 2 days
-							</button>
-							<button
-								onclick={() => showCatchUpBanner = false}
-								class="px-3 py-1.5 text-xs font-medium rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
-							>
-								Dismiss
-							</button>
-						</div>
-					</div>
-				</div>
 			</div>
 		{/if}
 
@@ -1073,38 +940,6 @@
 <!-- Filter Rules -->
 <FilterRules bind:open={filterRulesOpen} />
 
-<!-- Session Budget Prompt -->
-{#if showSessionPrompt}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm fade-in">
-		<div class="bg-[var(--color-card)] rounded-2xl p-6 shadow-2xl max-w-sm mx-4 fade-in-up border border-[var(--color-border)]">
-			<h2 class="text-lg font-bold text-[var(--color-text-primary)]">
-				How much time do you have?
-			</h2>
-			<p class="text-sm text-[var(--color-text-secondary)] mt-1">
-				{$articles.articles.filter(a => !a.is_read).length} unread articles waiting
-			</p>
-			<div class="grid grid-cols-2 gap-2 mt-4">
-				{#each [{ label: '5 min', value: 5 }, { label: '15 min', value: 15 }, { label: '30 min', value: 30 }, { label: 'No limit', value: null }] as option}
-					<button
-						onclick={() => { sessionBudget = option.value; sessionStartTime = Date.now(); showSessionPrompt = false; }}
-						class="px-4 py-3 rounded-xl text-sm font-medium transition-all
-							{option.value === null
-								? 'bg-[var(--color-elevated)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]'
-								: 'bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20'}"
-					>
-						{option.label}
-					</button>
-				{/each}
-			</div>
-			<button
-				onclick={() => showSessionPrompt = false}
-				class="w-full mt-3 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
-			>
-				Skip
-			</button>
-		</div>
-	</div>
-{/if}
 
 {#if showSessionSummary && sessionSummaryData}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->

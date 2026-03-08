@@ -11,7 +11,12 @@ FeedNest is a self-hosted RSS/Atom feed reader with a Go backend and SvelteKit f
 ## Quick Start
 
 ```bash
-docker compose up --build -d          # Build and run
+# Production (pre-built images from GHCR)
+docker compose up -d
+
+# Development (local build)
+docker compose -f docker-compose.dev.yml up --build -d
+
 docker compose logs -f backend        # Watch backend logs
 docker compose logs -f frontend       # Watch frontend logs
 docker compose down                   # Stop everything
@@ -122,6 +127,7 @@ $effect(() => {
 
 ```bash
 cd backend && go test ./...           # Run all backend tests
+cd frontend && npm test               # Run frontend unit tests (vitest)
 cd frontend && npm run check          # TypeScript + Svelte check
 ```
 
@@ -136,6 +142,29 @@ cd frontend && npm run check          # TypeScript + Svelte check
 4. **Docker volumes**: SQLite database persists in `feednest-data` named volume at `/data/feednest.db`.
 
 5. **Feed titles**: Some feeds store their description as the title (e.g., Engadget). The title comes from the RSS feed's `<title>` element and can be updated via PUT `/api/feeds/{id}`.
+
+## Release Workflow
+
+When making changes that warrant a new release:
+
+1. **Update CHANGELOG.md** — Add a new version section with features, fixes, and breaking changes
+2. **Update README.md** — Reflect any new features, changed commands, or updated screenshots
+3. **Commit and push** all changes to `main`
+4. **Tag the release** — `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin vX.Y.Z`
+5. **Create GitHub release** — `gh release create vX.Y.Z --title "vX.Y.Z" --notes-file CHANGELOG_EXCERPT.md` (or use changelog content)
+6. **Build Docker images** — Tag as both version and `latest`:
+   ```bash
+   docker build -t ghcr.io/swaeltjie/feednest-backend:X.Y.Z -t ghcr.io/swaeltjie/feednest-backend:latest ./backend
+   docker build -t ghcr.io/swaeltjie/feednest-frontend:X.Y.Z -t ghcr.io/swaeltjie/feednest-frontend:latest ./frontend
+   ```
+7. **Push Docker images** — Push both version and latest tags:
+   ```bash
+   docker push ghcr.io/swaeltjie/feednest-backend:X.Y.Z
+   docker push ghcr.io/swaeltjie/feednest-backend:latest
+   docker push ghcr.io/swaeltjie/feednest-frontend:X.Y.Z
+   docker push ghcr.io/swaeltjie/feednest-frontend:latest
+   ```
+8. **Update docker-compose.yml** — Change image tags to the new version
 
 ## Environment Variables
 

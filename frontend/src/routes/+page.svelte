@@ -58,17 +58,6 @@
 	let focusMode = $state(false);
 	let sentinelEl: HTMLElement | undefined = $state();
 
-	// Session tracking state
-	let sessionReadDetails = $state<Map<number, { title: string; readingTime: number; starred: boolean }>>(new Map());
-	let showSessionSummary = $state(false);
-	let sessionSummaryData = $state<{
-		articlesRead: number;
-		totalMinutes: number;
-		starred: number;
-		longestTitle: string;
-		longestMinutes: number;
-	} | null>(null);
-
 	function articleAgeOpacity(article: { is_read: boolean; published_at?: string | null }): number {
 		if (article.is_read) return 1; // read articles already have their own opacity
 		if (!article.published_at) return 1;
@@ -121,19 +110,6 @@
 
 	function openArticle(id: number) {
 		openArticleId = id;
-		// Track in session (record details for summary)
-		if (!sessionReadDetails.has(id)) {
-			const art = $articles.articles.find(a => a.id === id);
-			if (art) {
-				const newMap = new Map(sessionReadDetails);
-				newMap.set(id, {
-					title: art.title,
-					readingTime: art.reading_time || 3,
-					starred: art.is_starred,
-				});
-				sessionReadDetails = newMap;
-			}
-		}
 		const a = $articles.articles.find((a) => a.id === id);
 		if (a && !a.is_read) {
 			articles.toggleRead(id, true);
@@ -142,29 +118,6 @@
 	}
 
 	function closeArticle() {
-		// Build session summary if 2+ articles read
-		if (sessionReadDetails.size >= 2) {
-			let totalMinutes = 0;
-			let starred = 0;
-			let longestTitle = '';
-			let longestMinutes = 0;
-			for (const [, detail] of sessionReadDetails) {
-				totalMinutes += detail.readingTime;
-				if (detail.starred) starred++;
-				if (detail.readingTime > longestMinutes) {
-					longestMinutes = detail.readingTime;
-					longestTitle = detail.title;
-				}
-			}
-			sessionSummaryData = {
-				articlesRead: sessionReadDetails.size,
-				totalMinutes,
-				starred,
-				longestTitle,
-				longestMinutes,
-			};
-			showSessionSummary = true;
-		}
 		openArticleId = null;
 		focusMode = false;
 		articles.load(currentFilters);
@@ -940,45 +893,6 @@
 <!-- Filter Rules -->
 <FilterRules bind:open={filterRulesOpen} />
 
-
-{#if showSessionSummary && sessionSummaryData}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm fade-in"
-		onclick={() => showSessionSummary = false}>
-		<div class="bg-[var(--color-card)] rounded-2xl p-6 shadow-2xl max-w-sm mx-4 fade-in-up border border-[var(--color-border)]"
-			onclick={(e) => e.stopPropagation()}>
-			<div class="text-center">
-				<div class="w-12 h-12 rounded-2xl accent-gradient opacity-20 flex items-center justify-center mx-auto mb-3">
-					<svg class="w-6 h-6 text-[var(--color-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-					</svg>
-				</div>
-				<h2 class="text-lg font-bold text-[var(--color-text-primary)]">Reading Complete</h2>
-				<div class="flex items-center justify-center gap-3 mt-3 text-sm text-[var(--color-text-secondary)]">
-					<span>{sessionSummaryData.articlesRead} articles</span>
-					<span class="opacity-40">&middot;</span>
-					<span>~{sessionSummaryData.totalMinutes} min</span>
-					{#if sessionSummaryData.starred > 0}
-						<span class="opacity-40">&middot;</span>
-						<span>{sessionSummaryData.starred} starred</span>
-					{/if}
-				</div>
-				{#if sessionSummaryData.longestTitle}
-					<p class="text-xs text-[var(--color-text-tertiary)] mt-3 italic line-clamp-2">
-						"{sessionSummaryData.longestTitle}" was your longest read ({sessionSummaryData.longestMinutes} min)
-					</p>
-				{/if}
-			</div>
-			<button
-				onclick={() => { showSessionSummary = false; sessionReadDetails = new Map(); }}
-				class="w-full mt-5 px-4 py-2.5 text-sm font-medium text-white rounded-xl accent-gradient hover:opacity-90 transition-opacity"
-			>
-				Done
-			</button>
-		</div>
-	</div>
-{/if}
 
 <!-- Add Feed Modal -->
 {#if showAddFeedModal}

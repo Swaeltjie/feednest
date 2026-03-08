@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
+	"strings"
 	"strconv"
 	"time"
 	"unicode/utf8"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/feednest/backend/internal/apiutil"
 	"github.com/feednest/backend/internal/models"
+	"github.com/feednest/backend/internal/readability"
 	"github.com/feednest/backend/internal/store"
 )
 
@@ -24,6 +27,26 @@ type ArticleHandler struct {
 
 func NewArticleHandler(store *store.Queries) *ArticleHandler {
 	return &ArticleHandler{store: store}
+}
+
+func countWordsFromHTML(s string) int {
+	inTag := false
+	var buf []rune
+	for _, r := range s {
+		if r == '<' {
+			inTag = true
+			buf = append(buf, ' ')
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			buf = append(buf, r)
+		}
+	}
+	return len(strings.Fields(string(buf)))
 }
 
 func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -129,6 +152,25 @@ func (h *ArticleHandler) Get(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		}
 		return
+	}
+
+	// Lazy content extraction: if content_clean is empty and we have a URL,
+	// try extracting full article content on demand (RSS feeds often only
+	// provide a summary/teaser, and initial extraction may have failed).
+	if article.ContentClean == "" && article.URL != "" {
+		if clean, err := readability.ExtractContent(article.URL); err == nil && clean != "" {
+			article.ContentClean = clean
+			wordCount := countWordsFromHTML(clean)
+			readingTime := int(math.Ceil(float64(wordCount) / 200.0))
+			article.WordCount = wordCount
+			article.ReadingTime = readingTime
+			// Persist so we don't re-extract next time
+			go func() {
+				if err := h.store.UpdateArticleContent(id, clean, wordCount, readingTime); err != nil {
+					log.Printf("lazy-extract: failed to persist content for article %d: %v", id, err)
+				}
+			}()
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

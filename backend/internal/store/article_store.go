@@ -413,6 +413,14 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 	return articles, total, nil
 }
 
+func (q *Queries) UpdateArticleContent(id int64, contentClean string, wordCount, readingTime int) error {
+	_, err := q.db.Exec(
+		`UPDATE articles SET content_clean = ?, word_count = ?, reading_time = ? WHERE id = ?`,
+		contentClean, wordCount, readingTime, id,
+	)
+	return err
+}
+
 func (q *Queries) UpdateArticle(id, userID int64, isRead *bool, isStarred *bool) error {
 	if isRead != nil {
 		var readAt interface{}

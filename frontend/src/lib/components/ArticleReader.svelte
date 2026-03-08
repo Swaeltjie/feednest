@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { articles, type Article } from '$lib/stores/articles';
 	import { timeAgo } from '$lib/utils/time';
-	import { getFaviconUrl } from '$lib/utils/favicon';
+	import { getFaviconUrl, handleFaviconError } from '$lib/utils/favicon';
 	import { api } from '$lib/api/client';
 	import DOMPurify from 'isomorphic-dompurify';
 	import { isSafeUrl } from '$lib/api/client';
@@ -326,7 +326,7 @@
 					{#if article.feed_title}
 						<span class="flex items-center gap-1.5">
 							{#if getFaviconUrl(article.feed_icon_url, article.url, undefined)}
-								<img src={getFaviconUrl(article.feed_icon_url, article.url, undefined)} alt="" class="w-4 h-4 rounded" loading="lazy" onerror={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
+								<img src={getFaviconUrl(article.feed_icon_url, article.url, undefined)} alt="" class="w-4 h-4 rounded" loading="lazy" onerror={(e) => handleFaviconError(e, article?.url)} />
 							{/if}
 							<span class="font-medium text-[var(--color-text-primary)]">{article.feed_title}</span>
 						</span>

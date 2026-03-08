@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { feeds, categories, type Feed, type Category } from '$lib/stores/feeds';
 	import { auth } from '$lib/stores/auth';
-	import { getFaviconUrl } from '$lib/utils/favicon';
+	import { getFaviconUrl, handleFaviconError } from '$lib/utils/favicon';
 	import AnimatedCount from './AnimatedCount.svelte';
 	import { settings } from '$lib/stores/settings';
 
@@ -355,7 +355,7 @@
 							>
 								<span class="flex items-center gap-2 truncate">
 									{#if feedIcon(feed)}
-										<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" onerror={(e) => { const img = e.currentTarget as HTMLImageElement; const parent = img.parentElement; if (parent) { const span = document.createElement('span'); span.className = 'w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold'; span.textContent = img.closest('button')?.textContent?.trim()?.charAt(0)?.toUpperCase() || '?'; parent.replaceChild(span, img); } }} />
+										<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" onerror={(e) => handleFaviconError(e, feed.site_url, feed.url)} />
 									{:else}
 										<span class="w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold">
 											{feed.title?.charAt(0)?.toUpperCase() || '?'}
@@ -409,7 +409,7 @@
 					>
 						<span class="flex items-center gap-2 truncate">
 							{#if feedIcon(feed)}
-								<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" onerror={(e) => { const img = e.currentTarget as HTMLImageElement; const parent = img.parentElement; if (parent) { const span = document.createElement('span'); span.className = 'w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold'; span.textContent = img.closest('button')?.textContent?.trim()?.charAt(0)?.toUpperCase() || '?'; parent.replaceChild(span, img); } }} />
+								<img src={feedIcon(feed)} alt="" class="w-4 h-4 rounded-full flex-shrink-0" onerror={(e) => handleFaviconError(e, feed.site_url, feed.url)} />
 							{:else}
 								<span class="w-4 h-4 rounded-full accent-gradient text-[8px] text-white flex items-center justify-center flex-shrink-0 font-bold">
 									{feed.title?.charAt(0)?.toUpperCase() || '?'}

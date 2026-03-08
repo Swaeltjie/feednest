@@ -163,7 +163,7 @@ func deriveFaviconURL(siteURL string) string {
 	if err != nil || u.Host == "" {
 		return ""
 	}
-	return fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s&sz=32", u.Host)
+	return fmt.Sprintf("https://favicon.im/%s?larger=true", u.Host)
 }
 
 func countWords(s string) int {

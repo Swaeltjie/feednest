@@ -2,7 +2,7 @@
 	import type { Article } from '$lib/stores/articles';
 	import { articles } from '$lib/stores/articles';
 	import { timeAgo } from '$lib/utils/time';
-	import { getFaviconUrl } from '$lib/utils/favicon';
+	import { getFaviconUrl, handleFaviconError } from '$lib/utils/favicon';
 	import { getFeedColor } from '$lib/utils/color';
 	import { magneticHover } from '$lib/utils/parallax';
 	import { blurUp } from '$lib/utils/blurload';
@@ -79,7 +79,7 @@
 			style="background: rgba(255,255,255,0.1); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);"
 		>
 			{#if feedIcon}
-				<img src={feedIcon} alt="" class="w-3.5 h-3.5 rounded-full" onerror={(e) => (e.currentTarget as HTMLImageElement).style.display = 'none'} />
+				<img src={feedIcon} alt="" class="w-3.5 h-3.5 rounded-full" onerror={(e) => handleFaviconError(e, article.url)} />
 			{/if}
 			<span>{article.feed_title}</span>
 			<span class="opacity-50">·</span>

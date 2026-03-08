@@ -60,6 +60,14 @@
 	let showCatchUpBanner = $state(false);
 	let catchUpCount = $state(0);
 
+	// Session framing state
+	let sessionBudget = $state<number | null>(null);
+	let sessionStartTime = $state<number>(Date.now());
+	let sessionArticlesRead = $state<number[]>([]);
+	let showSessionPrompt = $state(false);
+	let sessionTimeElapsed = $state(0);
+	let sessionPromptShown = $state(false);
+
 	function articleAgeOpacity(article: { is_read: boolean; published_at?: string | null }): number {
 		if (article.is_read) return 1; // read articles already have their own opacity
 		if (!article.published_at) return 1;
@@ -112,6 +120,9 @@
 
 	function openArticle(id: number) {
 		openArticleId = id;
+		if (!sessionArticlesRead.includes(id)) {
+			sessionArticlesRead = [...sessionArticlesRead, id];
+		}
 		const a = $articles.articles.find((a) => a.id === id);
 		if (a && !a.is_read) {
 			articles.toggleRead(id, true);
@@ -488,6 +499,27 @@
 		};
 	});
 
+	// Session prompt: show when articles first load with enough unread
+	$effect(() => {
+		if (!sessionPromptShown && $articles.articles.length > 0 && !$articles.loading) {
+			const unreadCount = $articles.articles.filter(a => !a.is_read).length;
+			if (unreadCount >= 5) {
+				showSessionPrompt = true;
+			}
+			sessionPromptShown = true;
+		}
+	});
+
+	// Session timer: update elapsed time every 30 seconds
+	$effect(() => {
+		if (sessionBudget === null) return;
+		const interval = setInterval(() => {
+			sessionTimeElapsed = Math.floor((Date.now() - sessionStartTime) / 1000 / 60);
+		}, 30000);
+		sessionTimeElapsed = Math.floor((Date.now() - sessionStartTime) / 1000 / 60);
+		return () => clearInterval(interval);
+	});
+
 	let sessionEstimate = $derived.by(() => {
 		if (sidebarView !== 'today' && sidebarView !== 'long_reads') return null;
 		const arts = $articles.articles;
@@ -681,6 +713,16 @@
 				</div>
 
 				<div class="flex items-center gap-3">
+					<!-- Session timer -->
+					{#if sessionBudget !== null}
+						<div class="flex items-center gap-1.5 text-xs text-[var(--color-text-tertiary)]" title="Session timer">
+							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+							<span>{sessionTimeElapsed} / {sessionBudget} min</span>
+						</div>
+					{/if}
+
 					<!-- Refresh countdown -->
 					<button
 						onclick={async () => { refreshCountdown = 300; await feeds.load(); await articles.load(currentFilters); }}
@@ -750,6 +792,30 @@
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
 				<span>{sessionEstimate.count} articles, ~{sessionEstimate.minutes} min of reading</span>
+			</div>
+		{/if}
+
+		{#if sessionBudget !== null && sessionTimeElapsed >= sessionBudget && !openArticleId}
+			<div class="mx-4 mb-3 p-3 rounded-xl bg-[var(--color-accent)]/5 border border-[var(--color-accent)]/20 fade-in-up">
+				<div class="flex items-center justify-between">
+					<p class="text-sm text-[var(--color-text-secondary)]">
+						Your {sessionBudget} minutes are up. You read {sessionArticlesRead.length} article{sessionArticlesRead.length !== 1 ? 's' : ''}.
+					</p>
+					<div class="flex gap-2">
+						<button
+							onclick={() => { sessionBudget = sessionBudget! + 10; }}
+							class="px-3 py-1 text-xs font-medium rounded-lg text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors"
+						>
+							+10 min
+						</button>
+						<button
+							onclick={() => { sessionBudget = null; }}
+							class="px-3 py-1 text-xs font-medium rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
+						>
+							Done
+						</button>
+					</div>
+				</div>
 			</div>
 		{/if}
 
@@ -964,6 +1030,39 @@
 
 <!-- Filter Rules -->
 <FilterRules bind:open={filterRulesOpen} />
+
+<!-- Session Budget Prompt -->
+{#if showSessionPrompt}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm fade-in">
+		<div class="bg-[var(--color-card)] rounded-2xl p-6 shadow-2xl max-w-sm mx-4 fade-in-up border border-[var(--color-border)]">
+			<h2 class="text-lg font-bold text-[var(--color-text-primary)]">
+				How much time do you have?
+			</h2>
+			<p class="text-sm text-[var(--color-text-secondary)] mt-1">
+				{$articles.articles.filter(a => !a.is_read).length} unread articles waiting
+			</p>
+			<div class="grid grid-cols-2 gap-2 mt-4">
+				{#each [{ label: '5 min', value: 5 }, { label: '15 min', value: 15 }, { label: '30 min', value: 30 }, { label: 'No limit', value: null }] as option}
+					<button
+						onclick={() => { sessionBudget = option.value; sessionStartTime = Date.now(); showSessionPrompt = false; }}
+						class="px-4 py-3 rounded-xl text-sm font-medium transition-all
+							{option.value === null
+								? 'bg-[var(--color-elevated)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]'
+								: 'bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20'}"
+					>
+						{option.label}
+					</button>
+				{/each}
+			</div>
+			<button
+				onclick={() => showSessionPrompt = false}
+				class="w-full mt-3 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
+			>
+				Skip
+			</button>
+		</div>
+	</div>
+{/if}
 
 <!-- Add Feed Modal -->
 {#if showAddFeedModal}

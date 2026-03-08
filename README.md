@@ -17,7 +17,6 @@ No tracking. No ads. No algorithms deciding what you see.
 
 [Quick Start](#quick-start) ·
 [Features](#features) ·
-[Command Palette](#command-palette) ·
 [Keyboard Shortcuts](#keyboard-shortcuts) ·
 [Tech Stack](#tech-stack) ·
 [Development](#development)
@@ -64,30 +63,39 @@ Open **http://localhost:3000**, create your account, and add your first feed. Th
 - **Inline reading pane** — split-pane layout keeps article list visible while you read
 - **Focus mode** — press `f` to hide the list and go full-width for distraction-free reading
 - **Three view modes** — Hybrid (hero cards + dense list), Card grid, or compact List
-- **Smart prioritization** — articles scored by recency (60%) and feed engagement (40%) with exponential decay
-- **Beautiful typography** — tuned prose with proper headings, blockquote accents, and code formatting
+- **Smart prioritization** — articles scored by recency (60%) and engagement (40%) with exponential decay
+- **Customizable reader** — font size, font family, line height, and content width
 - **Content extraction** — pulls full articles even from summary-only feeds using readability
 - **Reading progress bar** — gradient bar tracks your scroll position through the article
+- **Personalized reading time** — learns your reading speed from actual behavior
 - **Article navigation** — `j`/`k` to move between articles without closing the reader
+
+### Wellbeing & Calm Design
+
+- **Calm mode** (on by default) — hides unread count badges to reduce notification anxiety
+- **Content aging** — old unread articles visually fade, signaling "it's OK to skip these"
+- **Session summary** — see how many articles you read and time spent when closing the reader
+- **Weekly reading stats** — sidebar widget shows articles read, time spent, and feed diversity
+- **Auto-mark read on scroll** — articles marked read after scrolling past (optional)
+- **No dark patterns** — no streaks, no FOMO notifications, no engagement-maximizing tricks
 
 ### Organization
 
 - **Categories & tags** — drag-and-drop categories, tag individual articles
-- **Inline category creation** — new categories right from the "Add Feed" modal
+- **Smart feeds** — Today (last 24h) and Long Reads (10+ min) built-in views
+- **Filter rules** — hide, auto-read, or auto-star articles by title, author, or content (regex supported)
 - **Cross-feed deduplication** — same article in multiple feeds? You'll only see it once
 - **Ad filtering** — automatically hides sponsored posts and bot-protection pages
-- **OPML import/export** — migrate from any reader in seconds (also available via command palette)
+- **OPML import/export** — migrate from any reader in seconds
 
 ### Interface
 
 - **Glassmorphic design** — frosted glass toolbars, gradient accents, adaptive dark/light themes
+- **Command palette** — `Ctrl+K` to access everything: navigation, views, sorting, feeds, actions
 - **Full-text search** — instant debounced search across all article titles and content
-- **Command palette** — `Ctrl+K` to access everything: navigation, views, sorting, feeds, actions, and article search
-- **Live refresh timer** — animated countdown ring shows next auto-refresh (click to refresh now)
 - **Keyboard-first** — vim-style navigation, chord sequences (`gg`, `G`), and single-key actions
 - **Spring animations** — physics-based motion system with staggered entrances and parallax effects
 - **Dynamic feed colors** — accent colors extracted from feed favicons
-- **Animated unread badges** — odometer-style count transitions in sidebar
 - **Mobile gestures** — swipe right to mark read, swipe left to star
 - **Responsive** — works beautifully from phones to ultra-wides
 
@@ -97,26 +105,7 @@ Open **http://localhost:3000**, create your account, and add your first feed. Th
 - **Multi-user** — JWT auth with automatic token refresh
 - **SSRF protection** — blocks requests to private/internal networks
 - **XSS protection** — article content sanitized with DOMPurify
-- **Security headers** — X-Frame-Options, nosniff, referrer policy out of the box
 - **Full REST API** — Swagger UI included at `/api/docs`
-
-<br/>
-
-## Command Palette
-
-Press `Ctrl+K` (or `Cmd+K` on Mac) to open the command palette — your fastest way to do anything in FeedNest.
-
-| Category | Commands |
-|----------|----------|
-| **Navigation** | Jump to All Articles, Unread, Starred, any category, or any feed |
-| **Views** | Switch between Hybrid, Card Grid, and List views |
-| **Sorting** | Change sort order: Smart, Newest First, Oldest First |
-| **Actions** | Refresh feeds, Mark all as read, Add feed, Toggle dark mode |
-| **OPML** | Import or export your feed subscriptions |
-| **Articles** | Search articles by title (type 2+ characters to search) |
-| **Utilities** | Open article in browser, View keyboard shortcuts |
-
-Results are fuzzy-matched as you type. Arrow keys to navigate, Enter to execute, Esc to close.
 
 <br/>
 
@@ -140,8 +129,6 @@ Results are fuzzy-matched as you type. Arrow keys to navigate, Enter to execute,
 | `Ctrl+K` | Command palette |
 | `?` | Keyboard shortcuts help |
 
-See [docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md) for the full reference.
-
 <br/>
 
 ## Tech Stack
@@ -161,60 +148,20 @@ See [docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md) for the full refere
 
 ## Development
 
-### Prerequisites
+See [docs/development.md](docs/development.md) for local setup, project structure, API reference, and environment variables.
 
-- **Go 1.26+** and **Node 24+** for local dev
-- **Docker** for containerized deployment
-
-### Local Development
+### Quick Reference
 
 ```bash
-# Backend — runs on :8082
-cd backend && go run ./cmd/feednest/
-
-# Frontend — runs on :5173 with HMR
-cd frontend && npm install && npm run dev
-```
-
-### Docker
-
-```bash
+# Docker (recommended)
 docker compose up --build -d     # Build and run
 docker compose logs -f           # Watch logs
 docker compose down              # Stop
+
+# Local dev
+cd backend && go run ./cmd/feednest/       # Backend on :8082
+cd frontend && npm install && npm run dev  # Frontend on :5173 with HMR
 ```
-
-### Project Structure
-
-```
-feednest/
-├── backend/
-│   ├── cmd/feednest/             # Entry point
-│   └── internal/
-│       ├── api/                  # Routes, auth, middleware, Swagger
-│       │   └── handlers/         # Request handlers
-│       ├── fetcher/              # RSS/Atom feed fetcher
-│       ├── readability/          # Full content extraction
-│       ├── scheduler/            # Background refresh
-│       ├── scorer/               # Smart article ranking (recency + engagement)
-│       ├── urlutil/              # SSRF protection
-│       └── store/                # SQLite data layer with indexes
-├── frontend/
-│   └── src/
-│       ├── lib/
-│       │   ├── api/              # HTTP client with token refresh
-│       │   ├── components/       # Svelte 5 components
-│       │   ├── stores/           # Reactive state management
-│       │   └── utils/            # Helpers (keyboard, color, particles, parallax, swipe)
-│       └── routes/               # SvelteKit pages
-├── docs/                         # Design docs, keyboard shortcuts reference
-├── assets/                       # Logo and banner SVGs
-└── docker-compose.yml
-```
-
-<br/>
-
-## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|

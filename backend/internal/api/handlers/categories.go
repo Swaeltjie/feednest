@@ -75,7 +75,7 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Name) > 255 {
+	if req.Name != nil && len(*req.Name) > 255 {
 		http.Error(w, `{"error":"name must not exceed 255 characters"}`, http.StatusBadRequest)
 		return
 	}

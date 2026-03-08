@@ -107,6 +107,11 @@ func runMigrations(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_tags_user_name ON tags(user_id, name);
 	CREATE INDEX IF NOT EXISTS idx_article_tags_article ON article_tags(article_id);
 	CREATE INDEX IF NOT EXISTS idx_article_tags_tag ON article_tags(tag_id);
+
+	-- Optimize cross-feed deduplication: covers the MIN(id) subquery
+	CREATE INDEX IF NOT EXISTS idx_articles_url_feed ON articles(url, feed_id) WHERE url != '';
+	-- Optimize article listing with date sorting
+	CREATE INDEX IF NOT EXISTS idx_articles_published_feed ON articles(feed_id, published_at DESC);
 	`
 
 	_, err := db.Exec(schema)

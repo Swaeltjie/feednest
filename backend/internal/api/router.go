@@ -22,6 +22,7 @@ type rateLimiter struct {
 	attempts map[string][]time.Time
 	window   time.Duration
 	max      int
+	stop     chan struct{}
 }
 
 func newRateLimiter(window time.Duration, max int) *rateLimiter {
@@ -29,31 +30,37 @@ func newRateLimiter(window time.Duration, max int) *rateLimiter {
 		attempts: make(map[string][]time.Time),
 		window:   window,
 		max:      max,
+		stop:     make(chan struct{}),
 	}
 	go rl.cleanup()
 	return rl
 }
 
 func (rl *rateLimiter) cleanup() {
+	ticker := time.NewTicker(rl.window)
+	defer ticker.Stop()
 	for {
-		time.Sleep(rl.window)
-		rl.mu.Lock()
-		now := time.Now()
-		for ip, times := range rl.attempts {
-			// Use a fresh slice to allow the old underlying array to be GC'd
-			var valid []time.Time
-			for _, t := range times {
-				if now.Sub(t) < rl.window {
-					valid = append(valid, t)
+		select {
+		case <-ticker.C:
+			rl.mu.Lock()
+			now := time.Now()
+			for ip, times := range rl.attempts {
+				var valid []time.Time
+				for _, t := range times {
+					if now.Sub(t) < rl.window {
+						valid = append(valid, t)
+					}
+				}
+				if len(valid) == 0 {
+					delete(rl.attempts, ip)
+				} else {
+					rl.attempts[ip] = valid
 				}
 			}
-			if len(valid) == 0 {
-				delete(rl.attempts, ip)
-			} else {
-				rl.attempts[ip] = valid
-			}
+			rl.mu.Unlock()
+		case <-rl.stop:
+			return
 		}
-		rl.mu.Unlock()
 	}
 }
 

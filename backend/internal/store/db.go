@@ -14,6 +14,8 @@ func NewDB(dbPath string) (*sql.DB, error) {
 
 	// SQLite doesn't support true concurrent writes; limit to avoid SQLITE_BUSY
 	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0) // connections reused indefinitely for SQLite
 
 	if err := db.Ping(); err != nil {
 		return nil, err

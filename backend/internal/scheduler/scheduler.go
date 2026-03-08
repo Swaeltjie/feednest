@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"context"
 	"log"
 	"sync"
 	"time"
@@ -51,11 +50,6 @@ func (s *Scheduler) Stop() {
 
 func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
 	go func() {
-		// Use a context with timeout to prevent goroutine leaks
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-
-		_ = ctx // context available for future cancellation propagation
 		result, err := fetcher.FetchFeed(feedURL)
 		if err != nil {
 			log.Printf("scheduler: immediate fetch failed for %s: %v", feedURL, err)
@@ -64,11 +58,13 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
 		}
 
 		if result.Title != "" {
-			s.store.UpdateFeedMetadata(feedID, &store.FeedMetadataUpdate{
+			if err := s.store.UpdateFeedMetadata(feedID, &store.FeedMetadataUpdate{
 				Title:   &result.Title,
 				SiteURL: &result.SiteURL,
 				IconURL: &result.IconURL,
-			})
+			}); err != nil {
+				log.Printf("scheduler: failed to update metadata for feed %d: %v", feedID, err)
+			}
 		}
 
 		for _, item := range result.Items {
@@ -90,15 +86,21 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string) {
 				}
 			}
 
-			s.store.CreateArticle(
+			if err := s.store.CreateArticle(
 				feedID, item.GUID, item.Title, item.URL, item.Author,
 				contentRaw, contentClean, thumbnailURL,
 				item.PublishedAt, item.WordCount, item.ReadingTime,
-			)
+			); err != nil {
+				log.Printf("scheduler: failed to create article %q: %v", item.GUID, err)
+			}
 		}
 
-		s.store.ClearFeedError(feedID)
-		s.store.UpdateFeedLastFetched(feedID)
+		if err := s.store.ClearFeedError(feedID); err != nil {
+			log.Printf("scheduler: failed to clear error for feed %d: %v", feedID, err)
+		}
+		if err := s.store.UpdateFeedLastFetched(feedID); err != nil {
+			log.Printf("scheduler: failed to update last_fetched for feed %d: %v", feedID, err)
+		}
 		log.Printf("scheduler: immediate fetch of %s (%d items)", feedURL, len(result.Items))
 	}()
 }
@@ -143,7 +145,9 @@ func (s *Scheduler) fetchAll() {
 				if result.IconURL != "" {
 					update.IconURL = &result.IconURL
 				}
-				s.store.UpdateFeedMetadata(feedID, update)
+				if err := s.store.UpdateFeedMetadata(feedID, update); err != nil {
+					log.Printf("scheduler: failed to update metadata for feed %d: %v", feedID, err)
+				}
 			}
 
 			for _, item := range result.Items {
@@ -165,15 +169,21 @@ func (s *Scheduler) fetchAll() {
 					}
 				}
 
-				s.store.CreateArticle(
+				if err := s.store.CreateArticle(
 					feedID, item.GUID, item.Title, item.URL, item.Author,
 					contentRaw, contentClean, thumbnailURL,
 					item.PublishedAt, item.WordCount, item.ReadingTime,
-				)
+				); err != nil {
+					log.Printf("scheduler: failed to create article %q: %v", item.GUID, err)
+				}
 			}
 
-			s.store.ClearFeedError(feedID)
-			s.store.UpdateFeedLastFetched(feedID)
+			if err := s.store.ClearFeedError(feedID); err != nil {
+				log.Printf("scheduler: failed to clear error for feed %d: %v", feedID, err)
+			}
+			if err := s.store.UpdateFeedLastFetched(feedID); err != nil {
+				log.Printf("scheduler: failed to update last_fetched for feed %d: %v", feedID, err)
+			}
 			log.Printf("scheduler: fetched %s (%d items)", feedURL, len(result.Items))
 		}(feed.ID, feed.URL, feed.Title)
 	}

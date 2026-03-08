@@ -40,7 +40,9 @@ function createSettingsStore() {
 	}
 
 	function apiPersist(key: string, value: string) {
-		api.put('/api/settings', { [key]: value }).catch(() => {});
+		api.put('/api/settings', { [key]: value }).catch((err) => {
+			console.warn('Failed to sync setting to server:', key, err);
+		});
 	}
 
 	const stored = ls('feednest_theme');

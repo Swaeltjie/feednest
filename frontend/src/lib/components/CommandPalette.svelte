@@ -323,6 +323,7 @@
 			}
 		};
 		input.click();
+		input.remove();
 	}
 
 	async function triggerOpmlExport() {
@@ -341,7 +342,8 @@
 			a.href = url;
 			a.download = 'feednest-feeds.opml';
 			a.click();
-			setTimeout(() => URL.revokeObjectURL(url), 10000);
+			a.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 5000);
 		} catch (err) {
 			console.error('OPML export failed:', err);
 			alert('OPML export failed');

@@ -1,7 +1,48 @@
+# Go
 backend/feednest
-.env
-*.db
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Node / Frontend
 node_modules/
 frontend/build/
 frontend/.svelte-kit/
+frontend/.output/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Environment
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Docker
+*.log
+
+# Images / screenshots (not part of the app)
 icons.png

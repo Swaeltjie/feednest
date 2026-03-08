@@ -165,11 +165,9 @@ func (h *ArticleHandler) Get(w http.ResponseWriter, r *http.Request) {
 			article.WordCount = wordCount
 			article.ReadingTime = readingTime
 			// Persist so we don't re-extract next time
-			go func() {
-				if err := h.store.UpdateArticleContent(id, clean, wordCount, readingTime); err != nil {
-					log.Printf("lazy-extract: failed to persist content for article %d: %v", id, err)
-				}
-			}()
+			if err := h.store.UpdateArticleContent(id, clean, wordCount, readingTime); err != nil {
+				log.Printf("lazy-extract: failed to persist content for article %d: %v", id, err)
+			}
 		}
 	}
 

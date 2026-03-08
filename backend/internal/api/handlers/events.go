@@ -20,7 +20,7 @@ func NewEventHandler(store *store.Queries) *EventHandler {
 }
 
 var validEventTypes = map[string]bool{
-	"open": true, "read": true, "dismiss": true, "scroll": true,
+	"open": true, "read": true, "dismiss": true, "scroll": true, "click": true,
 }
 
 func (h *EventHandler) Create(w http.ResponseWriter, r *http.Request) {

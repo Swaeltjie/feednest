@@ -62,21 +62,11 @@ function createAuthStore() {
 			}
 
 			try {
-				const data = await api.post<{ access_token: string }>('/api/auth/refresh', {
+				const data = await api.post<{ access_token: string; user: User }>('/api/auth/refresh', {
 					refresh_token: refreshTok,
 				});
 				setAccessToken(data.access_token);
-				// Decode user info from the JWT payload
-				let user: User | null = null;
-				try {
-					const payload = JSON.parse(atob(data.access_token.split('.')[1]));
-					if (payload.user_id) {
-						user = { id: payload.user_id, username: '', email: '' };
-					}
-				} catch {
-					// Token decode failed, continue with null user
-				}
-				set({ user, isAuthenticated: true, loading: false });
+				set({ user: data.user, isAuthenticated: true, loading: false });
 			} catch {
 				set({ user: null, isAuthenticated: false, loading: false });
 			}

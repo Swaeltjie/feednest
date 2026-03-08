@@ -217,8 +217,17 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, err := h.store.GetUserByID(claims.UserID)
+	if err != nil {
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"access_token": accessToken})
+	json.NewEncoder(w).Encode(models.RefreshResponse{
+		AccessToken: accessToken,
+		User:        *user,
+	})
 }
 
 func (h *AuthHandler) UserCount(w http.ResponseWriter, r *http.Request) {

@@ -1,8 +1,8 @@
 package handlers
 
 import (
+	"encoding/json"
 	"encoding/xml"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -171,7 +171,7 @@ func (h *OPMLHandler) Import(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"imported":%d,"total":%d}`, imported, len(feeds))
+	json.NewEncoder(w).Encode(map[string]int{"imported": imported, "total": len(feeds)})
 }
 
 func (h *OPMLHandler) Export(w http.ResponseWriter, r *http.Request) {

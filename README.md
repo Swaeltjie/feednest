@@ -75,7 +75,6 @@ Open **http://localhost:3000**, create your account, and add your first feed. Th
 - **Calm mode** (on by default) — hides unread count badges to reduce notification anxiety
 - **Content aging** — old unread articles visually fade, signaling "it's OK to skip these"
 - **Session summary** — see how many articles you read and time spent when closing the reader
-- **Weekly reading stats** — sidebar widget shows articles read, time spent, and feed diversity
 - **Auto-mark read on scroll** — articles marked read after scrolling past (optional)
 - **No dark patterns** — no streaks, no FOMO notifications, no engagement-maximizing tricks
 

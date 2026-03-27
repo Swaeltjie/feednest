@@ -149,6 +149,8 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
+		const target = e.target as HTMLElement;
+		if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
 		if (e.key === 'Escape') {
 			if (focusMode) {
 				onToggleFocus?.();
@@ -363,7 +365,7 @@
 							line-height: {READER_LINE_HEIGHT_MAP[$settings.readerLineHeight]};
 							max-width: {READER_CONTENT_WIDTH_MAP[$settings.readerContentWidth]}; margin: 0 auto;"
 					>
-						{@html DOMPurify.sanitize(article.content_clean, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
+						{@html DOMPurify.sanitize(article.content_clean, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button', 'style'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
 					</div>
 				{:else if article.content_raw}
 					<!-- RSS summary only — full content extraction failed (bot protection, paywall, etc.) -->
@@ -376,7 +378,7 @@
 								font-family: {READER_FONT_FAMILY_MAP[$settings.readerFontFamily]};
 								line-height: {READER_LINE_HEIGHT_MAP[$settings.readerLineHeight]};"
 						>
-							{@html DOMPurify.sanitize(article.content_raw, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
+							{@html DOMPurify.sanitize(article.content_raw, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button', 'style'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
 						</div>
 						{#if article.url && isSafeUrl(article.url)}
 							<div class="flex flex-col items-center py-8 border-t border-[var(--color-border)]">

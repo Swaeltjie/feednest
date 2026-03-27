@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -54,6 +55,9 @@ func (h *FeedHandler) Create(w http.ResponseWriter, r *http.Request) {
 		cat, err := h.store.CreateCategory(userID, req.NewCategory, 0)
 		if err == nil {
 			req.CategoryID = &cat.ID
+		} else if !strings.Contains(err.Error(), "UNIQUE constraint") {
+			http.Error(w, `{"error":"failed to create category"}`, http.StatusInternalServerError)
+			return
 		}
 	}
 

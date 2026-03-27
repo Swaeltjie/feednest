@@ -62,10 +62,13 @@ function createAuthStore() {
 			}
 
 			try {
-				const data = await api.post<{ access_token: string; user: User }>('/api/auth/refresh', {
+				const data = await api.post<{ access_token: string; refresh_token?: string; user: User }>('/api/auth/refresh', {
 					refresh_token: refreshTok,
 				});
 				setAccessToken(data.access_token);
+				if (data.refresh_token) {
+					localStorage.setItem('feednest_refresh_token', data.refresh_token);
+				}
 				set({ user: data.user, isAuthenticated: true, loading: false });
 			} catch {
 				set({ user: null, isAuthenticated: false, loading: false });

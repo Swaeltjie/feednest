@@ -19,7 +19,7 @@
 	let loading = $state(true);
 	let showForm = $state(false);
 	let formName = $state('');
-	let formFeedId = $state<number | null>(null);
+	let formFeedId = $state<number>(0);
 	let formField = $state('title');
 	let formOperator = $state('contains');
 	let formValue = $state('');
@@ -64,7 +64,7 @@
 
 	function resetForm() {
 		formName = '';
-		formFeedId = null;
+		formFeedId = 0;
 		formField = 'title';
 		formOperator = 'contains';
 		formValue = '';
@@ -95,7 +95,7 @@
 		try {
 			const body: Record<string, unknown> = {
 				name: formName.trim(),
-				feed_id: formFeedId,
+				feed_id: formFeedId || null,
 				field: formField,
 				operator: formOperator,
 				value: formValue.trim(),
@@ -204,7 +204,7 @@
 									focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all
 									appearance-none cursor-pointer"
 							>
-								<option value={null}>All feeds</option>
+								<option value={0}>All feeds</option>
 								{#each $feeds as feed}
 									<option value={feed.id}>{feed.title}</option>
 								{/each}

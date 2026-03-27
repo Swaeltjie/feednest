@@ -7,7 +7,7 @@
 			shortcuts: [
 				{ keys: ['j'], desc: 'Next article' },
 				{ keys: ['k'], desc: 'Previous article' },
-				{ keys: ['o', 'Enter'], desc: 'Open article' },
+				{ keys: ['Enter'], desc: 'Open article' },
 				{ keys: ['Esc'], desc: 'Close / deselect' },
 				{ keys: ['g g'], desc: 'Jump to top' },
 				{ keys: ['G'], desc: 'Jump to bottom' },

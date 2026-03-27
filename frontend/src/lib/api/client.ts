@@ -20,9 +20,10 @@ export function isSafeUrl(url: string): boolean {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-	const headers: Record<string, string> = {
-		'Content-Type': 'application/json',
-	};
+	const headers: Record<string, string> = {};
+	if (body !== undefined) {
+		headers['Content-Type'] = 'application/json';
+	}
 
 	if (accessToken) {
 		headers['Authorization'] = `Bearer ${accessToken}`;
@@ -31,7 +32,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 	const res = await fetch(`${API_BASE}${path}`, {
 		method,
 		headers,
-		body: body ? JSON.stringify(body) : undefined,
+		body: body !== undefined ? JSON.stringify(body) : undefined,
 	});
 
 	if (res.status === 401 && accessToken) {
@@ -41,12 +42,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 			const retry = await fetch(`${API_BASE}${path}`, {
 				method,
 				headers,
-				body: body ? JSON.stringify(body) : undefined,
+				body: body !== undefined ? JSON.stringify(body) : undefined,
 			});
 			if (!retry.ok) throw new Error(`API error: ${retry.status}`);
 			if (retry.status === 204) return undefined as T;
 			return retry.json();
 		}
+		// Refresh failed — clear auth state and redirect to login
+		if (typeof localStorage !== 'undefined') {
+			localStorage.removeItem('feednest_refresh_token');
+		}
+		accessToken = null;
+		if (typeof window !== 'undefined') {
+			window.location.href = '/auth/login';
+		}
+		throw new Error('Session expired');
 	}
 
 	if (!res.ok) {

@@ -50,11 +50,18 @@
 		if (article) {
 			const duration = Math.floor((Date.now() - startTime) / 1000);
 			if (duration > 5) {
-				api.post('/api/events', {
+				const payload = JSON.stringify({
 					article_id: article.id,
 					event_type: 'read',
 					duration_seconds: duration,
-				}).catch(() => {});
+				});
+				// Use sendBeacon for reliable delivery during page unload
+				if (navigator.sendBeacon) {
+					const blob = new Blob([payload], { type: 'application/json' });
+					navigator.sendBeacon('/api/events', blob);
+				} else {
+					api.post('/api/events', JSON.parse(payload)).catch(() => {});
+				}
 			}
 		}
 	}
@@ -287,7 +294,7 @@
 						line-height: {READER_LINE_HEIGHT_MAP[$settings.readerLineHeight]};
 						max-width: {READER_CONTENT_WIDTH_MAP[$settings.readerContentWidth]}; margin: 0 auto;"
 				>
-					{@html DOMPurify.sanitize(article.content_clean, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
+					{@html DOMPurify.sanitize(article.content_clean, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button', 'style'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
 				</div>
 			{:else if article.content_raw}
 				<!-- RSS summary only — full content extraction failed -->
@@ -300,7 +307,7 @@
 							font-family: {READER_FONT_FAMILY_MAP[$settings.readerFontFamily]};
 							line-height: {READER_LINE_HEIGHT_MAP[$settings.readerLineHeight]};"
 					>
-						{@html DOMPurify.sanitize(article.content_raw, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
+						{@html DOMPurify.sanitize(article.content_raw, { FORBID_TAGS: ['form', 'input', 'textarea', 'select', 'button', 'style'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'] })}
 					</div>
 					{#if article.url && isSafeUrl(article.url)}
 						<div class="flex flex-col items-center py-8 border-t border-[var(--color-border)]">

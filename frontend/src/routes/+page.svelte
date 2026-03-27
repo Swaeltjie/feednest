@@ -33,7 +33,7 @@
 	let activeCategoryId = $state<number | null>(null);
 	let showAddFeedModal = $state(false);
 	let feedUrl = $state('');
-	let feedCategoryId = $state<number | undefined>(undefined);
+	let feedCategoryId = $state<number>(0);
 	let addingFeed = $state(false);
 	let newCategoryName = $state('');
 	let addFeedError = $state('');
@@ -244,7 +244,7 @@
 	function openAddFeed() {
 		showAddFeedModal = true;
 		feedUrl = '';
-		feedCategoryId = undefined;
+		feedCategoryId = 0;
 		newCategoryName = '';
 		addFeedError = '';
 		discoveredFeeds = [];
@@ -1068,7 +1068,7 @@
 							focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all
 							disabled:opacity-50 appearance-none cursor-pointer"
 					>
-						<option value={undefined}>None</option>
+						<option value={0}>None</option>
 						{#each $categories as cat}
 							<option value={cat.id}>{cat.name}</option>
 						{/each}

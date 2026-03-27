@@ -1,19 +1,16 @@
 export function getFaviconUrl(iconUrl: string | undefined, siteUrl: string | undefined, feedUrl?: string): string | null {
+	// Prefer feed-provided icon (avoids third-party dependency and privacy leak)
+	if (iconUrl) return iconUrl;
+
 	const url = siteUrl || feedUrl;
 	if (url) {
 		try {
 			const parsed = new URL(url);
-			// favicon.im checks HTML link tags, web manifests, Apple touch icons,
-			// /favicon.ico, and falls back to Google — much better coverage than
-			// Google's s2/favicons which often returns a generic globe icon.
 			return `https://favicon.im/${parsed.host}?larger=true`;
 		} catch {
 			// fall through
 		}
 	}
-
-	// Fall back to feed-provided icon
-	if (iconUrl) return iconUrl;
 
 	return null;
 }

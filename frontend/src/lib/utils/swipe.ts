@@ -65,6 +65,7 @@ export function swipeable(node: HTMLElement, options: SwipeOptions) {
 
 		if (!isDragging && Math.abs(dy) > Math.abs(dx)) return;
 		isDragging = true;
+		e.preventDefault();
 
 		currentX = dx;
 		const dampened = currentX * 0.6;

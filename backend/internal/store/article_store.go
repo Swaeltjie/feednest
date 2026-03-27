@@ -264,8 +264,9 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		}
 	}
 
-	// Cross-feed deduplication: keep only the article with the lowest ID for each URL
-	conditions = append(conditions, `a.id = (SELECT MIN(a2.id) FROM articles a2 JOIN feeds f2 ON a2.feed_id = f2.id WHERE a2.url = a.url AND f2.user_id = ? AND a2.url != '')`)
+	// Cross-feed deduplication: keep only the article with the lowest ID for each URL.
+	// Articles with empty URLs are exempt (no URL to deduplicate on).
+	conditions = append(conditions, `(a.url = '' OR a.id = (SELECT MIN(a2.id) FROM articles a2 JOIN feeds f2 ON a2.feed_id = f2.id WHERE a2.url = a.url AND f2.user_id = ? AND a2.url != ''))`)
 	args = append(args, userID)
 
 	// Filter sponsored/ad content
@@ -367,8 +368,6 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 			snippet = makeSnippet(a.ContentRaw, 160)
 		}
 		a.Snippet = snippet
-		a.ContentClean = ""
-		a.ContentRaw = ""
 		articles = append(articles, a)
 	}
 	if err := rows.Err(); err != nil {
@@ -383,7 +382,8 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		}
 	}
 
-	// Post-filter regex hide rules
+	// Post-filter regex hide rules (runs before clearing full content so regex
+	// matches against the complete article text, not the truncated snippet)
 	if len(regexHideRules) > 0 {
 		filtered := articles[:0]
 		for _, a := range articles {
@@ -399,7 +399,11 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 				case "author":
 					fieldValue = a.Author
 				case "content":
-					fieldValue = a.Snippet
+					if a.ContentClean != "" {
+						fieldValue = a.ContentClean
+					} else {
+						fieldValue = a.ContentRaw
+					}
 				}
 				if re, err := compileRegexCached(rule.Value); err == nil && re.MatchString(fieldValue) {
 					hidden = true
@@ -411,6 +415,12 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 			}
 		}
 		articles = filtered
+	}
+
+	// Clear full content from list responses (only snippets needed)
+	for i := range articles {
+		articles[i].ContentClean = ""
+		articles[i].ContentRaw = ""
 	}
 
 	return articles, total, nil
@@ -633,7 +643,9 @@ func (q *Queries) CatchUp(userID int64, strategy string, value string, count int
 			)`, feedCondition, feedCondition)
 
 		// Double the args for the two subqueries, plus count
-		allArgs := append(args, args...)
+		allArgs := make([]interface{}, 0, len(args)*2+1)
+		allArgs = append(allArgs, args...)
+		allArgs = append(allArgs, args...)
 		allArgs = append(allArgs, count)
 
 		result, err := q.db.Exec(query, allArgs...)

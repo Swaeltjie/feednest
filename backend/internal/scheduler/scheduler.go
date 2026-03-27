@@ -3,6 +3,7 @@ package scheduler
 import (
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/feednest/backend/internal/fetcher"
@@ -60,7 +61,7 @@ func (s *Scheduler) backfillThumbnails() {
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 5)
-	filled := 0
+	var filled atomic.Int64
 
 	for _, a := range articles {
 		wg.Add(1)
@@ -79,12 +80,12 @@ func (s *Scheduler) backfillThumbnails() {
 				log.Printf("scheduler: failed to update thumbnail for article %d: %v", id, err)
 				return
 			}
-			filled++
+			filled.Add(1)
 		}(a.ID, a.URL)
 	}
 
 	wg.Wait()
-	log.Printf("scheduler: backfilled %d/%d thumbnails", filled, len(articles))
+	log.Printf("scheduler: backfilled %d/%d thumbnails", filled.Load(), len(articles))
 }
 
 func (s *Scheduler) Stop() {

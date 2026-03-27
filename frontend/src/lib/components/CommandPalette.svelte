@@ -299,7 +299,7 @@
 		});
 	}
 
-	const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8082';
+	const API_BASE = import.meta.env.VITE_API_URL || '';
 
 	function triggerOpmlImport() {
 		const input = document.createElement('input');

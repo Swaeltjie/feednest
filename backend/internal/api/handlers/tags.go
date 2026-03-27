@@ -45,9 +45,9 @@ func (h *TagHandler) AddToArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify the article belongs to this user
-	if _, err := h.store.GetArticle(articleID, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+	// Verify the article belongs to this user (lightweight check)
+	if ok, err := h.store.ArticleBelongsToUser(articleID, userID); err != nil || !ok {
+		if errors.Is(err, sql.ErrNoRows) || !ok {
 			http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
 		} else {
 			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
@@ -84,9 +84,9 @@ func (h *TagHandler) RemoveFromArticle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
 		return
 	}
-	// Verify the article belongs to this user
-	if _, err := h.store.GetArticle(articleID, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+	// Verify the article belongs to this user (lightweight check)
+	if ok, err := h.store.ArticleBelongsToUser(articleID, userID); err != nil || !ok {
+		if errors.Is(err, sql.ErrNoRows) || !ok {
 			http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
 		} else {
 			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)

@@ -77,6 +77,10 @@ func (h *RulesHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Operator == "regex" {
+		if len(req.Value) > 200 {
+			http.Error(w, `{"error":"regex pattern must not exceed 200 characters"}`, http.StatusBadRequest)
+			return
+		}
 		if _, err := regexp.Compile(req.Value); err != nil {
 			http.Error(w, `{"error":"invalid regex pattern"}`, http.StatusBadRequest)
 			return
@@ -129,6 +133,10 @@ func (h *RulesHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Operator != nil && *req.Operator == "regex" && req.Value != nil {
+		if len(*req.Value) > 200 {
+			http.Error(w, `{"error":"regex pattern must not exceed 200 characters"}`, http.StatusBadRequest)
+			return
+		}
 		if _, err := regexp.Compile(*req.Value); err != nil {
 			http.Error(w, `{"error":"invalid regex pattern"}`, http.StatusBadRequest)
 			return

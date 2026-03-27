@@ -132,6 +132,13 @@ type ArticleFilter struct {
 	Limit          int
 }
 
+// ArticleExistsByGUID checks if an article with the given GUID already exists for a feed.
+func (q *Queries) ArticleExistsByGUID(feedID int64, guid string) bool {
+	var exists int
+	err := q.db.QueryRow("SELECT 1 FROM articles WHERE feed_id = ? AND guid = ? LIMIT 1", feedID, guid).Scan(&exists)
+	return err == nil
+}
+
 func (q *Queries) CreateArticle(feedID int64, guid, title, url, author, contentRaw, contentClean, thumbnailURL string, publishedAt *time.Time, wordCount, readingTime int) error {
 	_, err := q.db.Exec(`
 		INSERT OR IGNORE INTO articles (feed_id, guid, title, url, author, content_raw, content_clean, thumbnail_url, published_at, word_count, reading_time)
@@ -689,4 +696,17 @@ func (q *Queries) CreateReadingEvent(articleID int64, eventType string, duration
 		articleID, eventType, durationSeconds,
 	)
 	return err
+}
+
+// ArticleBelongsToUser checks article ownership without fetching full content.
+func (q *Queries) ArticleBelongsToUser(articleID, userID int64) (bool, error) {
+	var exists int
+	err := q.db.QueryRow(
+		"SELECT 1 FROM articles a JOIN feeds f ON a.feed_id = f.id WHERE a.id = ? AND f.user_id = ? LIMIT 1",
+		articleID, userID,
+	).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

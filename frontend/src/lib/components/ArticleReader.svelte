@@ -93,21 +93,27 @@
 		}
 	});
 
+	let scrollRafPending = false;
 	function handleReaderScroll(e: Event) {
-		const target = e.target as HTMLElement;
-		readerScrollY = target.scrollTop;
+		if (scrollRafPending) return;
+		scrollRafPending = true;
+		requestAnimationFrame(() => {
+			scrollRafPending = false;
+			const target = e.target as HTMLElement;
+			readerScrollY = target.scrollTop;
 
-		// Task 8: Progress bar
-		const scrollHeight = target.scrollHeight - target.clientHeight;
-		readingProgress = scrollHeight > 0 ? Math.min(100, (readerScrollY / scrollHeight) * 100) : 0;
+			// Progress bar
+			const scrollHeight = target.scrollHeight - target.clientHeight;
+			readingProgress = scrollHeight > 0 ? Math.min(100, (readerScrollY / scrollHeight) * 100) : 0;
 
-		// Task 9: Header collapse
-		if (readerScrollY > 120 && readerScrollY > lastScrollY) {
-			readerHeaderCompact = true;
-		} else if (readerScrollY < lastScrollY) {
-			readerHeaderCompact = false;
-		}
-		lastScrollY = readerScrollY;
+			// Header collapse
+			if (readerScrollY > 120 && readerScrollY > lastScrollY) {
+				readerHeaderCompact = true;
+			} else if (readerScrollY < lastScrollY) {
+				readerHeaderCompact = false;
+			}
+			lastScrollY = readerScrollY;
+		});
 	}
 
 	function trackReadTime() {

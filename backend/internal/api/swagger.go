@@ -15,7 +15,7 @@ func swaggerUI(w http.ResponseWriter, r *http.Request) {
 <head>
   <meta charset="UTF-8">
   <title>FeedNest API</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.18.2/swagger-ui.css" integrity="sha256-VAnDgCFieKLfi0VXWwjhEVMtSKdIWLBrKJoe7MoPPiA=" crossorigin="anonymous">
   <style>
     body { margin: 0; }
     .swagger-ui .topbar { display: none; }
@@ -24,7 +24,7 @@ func swaggerUI(w http.ResponseWriter, r *http.Request) {
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.18.2/swagger-ui-bundle.js" integrity="sha256-89+x4m2xIxMHfJU4GHnevKwNf5mYuJSVENLIkqFpJGE=" crossorigin="anonymous"></script>
   <script>
     SwaggerUIBundle({
       url: '/api/docs/openapi.yaml',
@@ -40,6 +40,5 @@ func swaggerUI(w http.ResponseWriter, r *http.Request) {
 
 func openapiYAML(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/yaml")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Write(openapiSpec)
 }

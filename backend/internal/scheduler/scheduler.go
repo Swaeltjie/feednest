@@ -16,6 +16,7 @@ type Scheduler struct {
 	interval time.Duration
 	stop     chan struct{}
 	stopOnce sync.Once
+	fetchSem chan struct{} // limits concurrent immediate fetches
 }
 
 func New(store *store.Queries, interval time.Duration) *Scheduler {
@@ -23,12 +24,13 @@ func New(store *store.Queries, interval time.Duration) *Scheduler {
 		store:    store,
 		interval: interval,
 		stop:     make(chan struct{}),
+		fetchSem: make(chan struct{}, 5),
 	}
 }
 
 func (s *Scheduler) Start() {
 	go func() {
-		s.backfillThumbnails()
+		go s.backfillThumbnails() // run concurrently, don't block first fetch
 		s.fetchAll()
 
 		ticker := time.NewTicker(s.interval)
@@ -94,6 +96,8 @@ func (s *Scheduler) Stop() {
 
 func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string, userID int64) {
 	go func() {
+		s.fetchSem <- struct{}{}
+		defer func() { <-s.fetchSem }()
 		result, err := fetcher.FetchFeed(feedURL)
 		if err != nil {
 			log.Printf("scheduler: immediate fetch failed for %s: %v", feedURL, err)
@@ -201,7 +205,13 @@ func (s *Scheduler) fetchAll() {
 				}
 			}
 
+			newItems := 0
 			for _, item := range result.Items {
+				// Skip readability extraction for articles that already exist
+				if s.store.ArticleExistsByGUID(feedID, item.GUID) {
+					continue
+				}
+
 				thumbnailURL := item.ThumbnailURL
 				contentRaw := item.ContentRaw
 
@@ -227,6 +237,7 @@ func (s *Scheduler) fetchAll() {
 				); err != nil {
 					log.Printf("scheduler: failed to create article %q: %v", item.GUID, err)
 				}
+				newItems++
 			}
 
 			if err := s.store.ClearFeedError(feedID); err != nil {
@@ -235,7 +246,7 @@ func (s *Scheduler) fetchAll() {
 			if err := s.store.UpdateFeedLastFetched(feedID); err != nil {
 				log.Printf("scheduler: failed to update last_fetched for feed %d: %v", feedID, err)
 			}
-			log.Printf("scheduler: fetched %s (%d items)", feedURL, len(result.Items))
+			log.Printf("scheduler: fetched %s (%d new / %d total items)", feedURL, newItems, len(result.Items))
 		}(feed.ID, feed.UserID, feed.URL, feed.Title)
 	}
 

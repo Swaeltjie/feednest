@@ -35,6 +35,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bind frontend Docker port to `127.0.0.1` to match backend's localhost-only binding
 - Add missing `ALLOWED_ORIGINS` environment variable to `docker-compose.dev.yml`
 
+### Security
+
+#### Backend
+- Pin Swagger UI CDN resources to exact version (5.18.2) with Subresource Integrity hashes
+- Remove wildcard `Access-Control-Allow-Origin: *` from OpenAPI YAML endpoint
+- Add JWT `Issuer` claim for token provenance verification
+- Sanitize feed error messages to prevent internal network information leakage
+- Limit regex filter patterns to 200 characters to mitigate CPU-based DoS
+- Add semaphore to `FetchFeedNow` to limit concurrent immediate fetches (max 5)
+
+#### Frontend
+- Pin Swagger UI CDN resources to exact version with SRI hashes (matching backend)
+- Use `fetch` with `keepalive: true` instead of `sendBeacon` for read tracking to preserve JWT auth header
+
+### Performance
+
+#### Backend
+- Reuse HTTP connections via shared transport with connection pooling (was creating new client per request)
+- Skip readability extraction for articles that already exist (check GUID before expensive HTTP fetch)
+- Optimize `ListFeeds` unread count query from N correlated subqueries to single `LEFT JOIN` + `GROUP BY`
+- Wrap `UpdateSettings` in a single transaction instead of N separate write transactions
+- Add lightweight `ArticleBelongsToUser` ownership check for tags/events handlers (avoids fetching full article content)
+- Run thumbnail backfill concurrently with first feed fetch on startup
+
+#### Frontend
+- Throttle article reader scroll handler via `requestAnimationFrame` to prevent excessive re-renders
+- Parallelize initial API loads (feeds, categories, articles) instead of sequential waterfall
+- Replace render-blocking CSS `@import` for Google Font with non-blocking `<link preload>`
+
 ## [1.0.0] - 2026-03-08
 
 ### Features

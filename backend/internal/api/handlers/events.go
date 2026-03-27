@@ -41,9 +41,9 @@ func (h *EventHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify the article belongs to this user
-	if _, err := h.store.GetArticle(req.ArticleID, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+	// Verify the article belongs to this user (lightweight check)
+	if ok, err := h.store.ArticleBelongsToUser(req.ArticleID, userID); err != nil || !ok {
+		if errors.Is(err, sql.ErrNoRows) || !ok {
 			http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
 		} else {
 			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)

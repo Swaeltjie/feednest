@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { articles, type Article } from '$lib/stores/articles';
 	import { timeAgo } from '$lib/utils/time';
-	import { api } from '$lib/api/client';
+	import { api, getAccessToken } from '$lib/api/client';
 	import { onMount } from 'svelte';
 	import { DOMPurify, initSanitizer } from '$lib/utils/sanitize';
 	import { isSafeUrl } from '$lib/api/client';
@@ -55,13 +55,17 @@
 					event_type: 'read',
 					duration_seconds: duration,
 				});
-				// Use sendBeacon for reliable delivery during page unload
-				if (navigator.sendBeacon) {
-					const blob = new Blob([payload], { type: 'application/json' });
-					navigator.sendBeacon('/api/events', blob);
-				} else {
-					api.post('/api/events', JSON.parse(payload)).catch(() => {});
-				}
+				// Use fetch with keepalive for reliable delivery during page unload
+				// (unlike sendBeacon, this preserves the Authorization header)
+				const token = getAccessToken();
+				const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+				if (token) headers['Authorization'] = `Bearer ${token}`;
+				fetch('/api/events', {
+					method: 'POST',
+					headers,
+					body: payload,
+					keepalive: true,
+				}).catch(() => {});
 			}
 		}
 	}

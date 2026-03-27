@@ -342,8 +342,7 @@
 		}, 300000);
 
 		try {
-			await Promise.all([feeds.load(), categories.load()]);
-			await articles.load(currentFilters);
+			await Promise.all([feeds.load(), categories.load(), articles.load(currentFilters)]);
 		} finally {
 			initialized = true;
 		}

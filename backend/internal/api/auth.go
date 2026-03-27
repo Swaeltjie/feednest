@@ -43,6 +43,7 @@ func generateToken(userID int64, secret string, duration time.Duration, tokenTyp
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "feednest",
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

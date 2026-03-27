@@ -36,8 +36,12 @@ func (q *Queries) ListFeeds(userID int64) ([]models.Feed, error) {
 	rows, err := q.db.Query(`
 		SELECT f.id, f.user_id, f.url, f.title, f.site_url, f.icon_url,
 			f.category_id, f.fetch_interval, f.last_fetched, f.engagement_score, f.created_at, f.last_error,
-			COALESCE((SELECT COUNT(*) FROM articles a WHERE a.feed_id = f.id AND a.is_read = 0), 0) as unread_count
-		FROM feeds f WHERE f.user_id = ? ORDER BY f.title`, userID,
+			COALESCE(uc.cnt, 0) as unread_count
+		FROM feeds f
+		LEFT JOIN (
+			SELECT feed_id, COUNT(*) as cnt FROM articles WHERE is_read = 0 GROUP BY feed_id
+		) uc ON uc.feed_id = f.id
+		WHERE f.user_id = ? ORDER BY f.title`, userID,
 	)
 	if err != nil {
 		return nil, err
@@ -148,8 +152,33 @@ type FeedMetadataUpdate struct {
 }
 
 func (q *Queries) SetFeedError(id int64, errMsg string) error {
-	_, err := q.db.Exec("UPDATE feeds SET last_error = ? WHERE id = ?", errMsg, id)
+	// Sanitize error message to avoid leaking internal network details
+	sanitized := sanitizeFeedError(errMsg)
+	_, err := q.db.Exec("UPDATE feeds SET last_error = ? WHERE id = ?", sanitized, id)
 	return err
+}
+
+func sanitizeFeedError(msg string) string {
+	lower := strings.ToLower(msg)
+	if strings.Contains(lower, "private ip") || strings.Contains(lower, "not allowed") {
+		return "URL blocked by security policy"
+	}
+	if strings.Contains(lower, "no such host") || strings.Contains(lower, "lookup") {
+		return "DNS resolution failed"
+	}
+	if strings.Contains(lower, "connection refused") {
+		return "Connection refused"
+	}
+	if strings.Contains(lower, "timeout") || strings.Contains(lower, "deadline exceeded") {
+		return "Connection timed out"
+	}
+	if strings.Contains(lower, "tls") || strings.Contains(lower, "certificate") {
+		return "TLS/SSL error"
+	}
+	if len(msg) > 200 {
+		msg = msg[:200]
+	}
+	return msg
 }
 
 func (q *Queries) ClearFeedError(id int64) error {

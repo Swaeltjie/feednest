@@ -30,10 +30,18 @@ func (q *Queries) SetSetting(userID int64, key, value string) error {
 }
 
 func (q *Queries) UpdateSettings(userID int64, settings map[string]string) error {
+	tx, err := q.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	for key, value := range settings {
-		if err := q.SetSetting(userID, key, value); err != nil {
+		if _, err := tx.Exec(
+			"INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?) ON CONFLICT(user_id, key) DO UPDATE SET value = ?",
+			userID, key, value, value,
+		); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }

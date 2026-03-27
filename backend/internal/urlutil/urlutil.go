@@ -62,35 +62,41 @@ func isPrivateIP(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified()
 }
 
+// sharedTransport is a long-lived transport with SSRF-safe dialing and connection pooling.
+var sharedTransport = &http.Transport{
+	MaxIdleConns:        50,
+	MaxIdleConnsPerHost: 5,
+	IdleConnTimeout:     90 * time.Second,
+	DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		ips, err := net.LookupHost(host)
+		if err != nil {
+			return nil, err
+		}
+		for _, ipStr := range ips {
+			ip := net.ParseIP(ipStr)
+			if ip != nil && isPrivateIP(ip) {
+				return nil, fmt.Errorf("connection to private IP %s is not allowed", ipStr)
+			}
+		}
+		// Connect to the first resolved IP to pin it
+		dialer := &net.Dialer{Timeout: 10 * time.Second}
+		if len(ips) > 0 {
+			addr = net.JoinHostPort(ips[0], port)
+		}
+		return dialer.DialContext(ctx, network, addr)
+	},
+}
+
 // SafeHTTPClient returns an http.Client that validates resolved IPs
-// at connection time, preventing DNS rebinding attacks.
+// at connection time, preventing DNS rebinding attacks. Uses a shared
+// transport for connection pooling and keep-alive reuse.
 func SafeHTTPClient(timeout time.Duration) *http.Client {
 	if AllowPrivate {
 		return &http.Client{Timeout: timeout}
 	}
-	dialer := &net.Dialer{Timeout: 10 * time.Second}
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, err
-			}
-			ips, err := net.LookupHost(host)
-			if err != nil {
-				return nil, err
-			}
-			for _, ipStr := range ips {
-				ip := net.ParseIP(ipStr)
-				if ip != nil && isPrivateIP(ip) {
-					return nil, fmt.Errorf("connection to private IP %s is not allowed", ipStr)
-				}
-			}
-			// Connect to the first resolved IP to pin it
-			if len(ips) > 0 {
-				addr = net.JoinHostPort(ips[0], port)
-			}
-			return dialer.DialContext(ctx, network, addr)
-		},
-	}
-	return &http.Client{Timeout: timeout, Transport: transport}
+	return &http.Client{Timeout: timeout, Transport: sharedTransport}
 }

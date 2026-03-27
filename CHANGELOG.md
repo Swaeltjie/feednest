@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Update Go module version from 1.25.3 to 1.26 to match Dockerfile
+- Update TypeScript from 5.9 to 6.0
+- Update jsdom from 28.x to 29.x
+- Update isomorphic-dompurify from 3.0.0 to 3.7.1
+- Update @sveltejs/kit, svelte, vitest, tailwindcss, svelte-check to latest minor/patch versions
+- Remove unused `@sveltejs/adapter-auto` dependency (project uses adapter-node)
+
 ### Fixed
 - Fix race condition on thumbnail backfill counter using `sync/atomic`
 - Fix articles with empty URLs being silently excluded from listings

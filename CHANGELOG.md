@@ -8,60 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-
-#### Backend
 - Fix race condition on thumbnail backfill counter using `sync/atomic`
 - Fix articles with empty URLs being silently excluded from listings
 - Fix regex hide rules matching against truncated snippet instead of full article content
 - Fix fragile slice append pattern in catch-up query that could corrupt arguments
 - Surface category creation errors during feed creation instead of silently swallowing them
-- Remove duplicate `MaxBytesReader` wrapping in OPML import handler (middleware already applies it)
-
-#### Frontend
+- Remove duplicate `MaxBytesReader` wrapping in OPML import handler
 - Fix hardcoded `localhost:8082` in CommandPalette breaking OPML import/export in production
-- Fix `value={null}` and `value={undefined}` in select elements producing string values instead of proper nulls
-- Fix global keyboard handler in ArticleReader capturing keystrokes while typing in text inputs
+- Fix select elements producing string `"null"`/`"undefined"` instead of proper null values
+- Fix keyboard handler in ArticleReader capturing keystrokes while typing in text inputs
 - Fix silent auth failure on expired session — now clears state and redirects to login
 - Save refresh token during `checkAuth` to prevent stale token after page reload
 - Fix calm mode defaulting to on for new users (now defaults to off)
-- Use `navigator.sendBeacon` for read time tracking on page unload for reliable delivery
-- Add `preventDefault` to swipe `touchmove` handler to prevent scroll conflict
-- Prefer feed-provided favicon icons over third-party favicon service
-- Block `<style>` tags in DOMPurify sanitizer to prevent CSS injection from malicious feeds
-- Remove undocumented `o` shortcut from keyboard hints (only `Enter` opens articles)
-- Fix `Content-Type: application/json` being sent on bodyless GET/DELETE requests
-
-#### Configuration
-- Bind frontend Docker port to `127.0.0.1` to match backend's localhost-only binding
-- Add missing `ALLOWED_ORIGINS` environment variable to `docker-compose.dev.yml`
+- Fix swipe `touchmove` handler conflicting with page scroll
+- Prefer feed-provided favicon icons over third-party service
+- Fix `Content-Type` header being sent on bodyless GET/DELETE requests
+- Remove undocumented `o` shortcut from keyboard hints
+- Bind frontend Docker port to `127.0.0.1` to match backend security posture
+- Add missing `ALLOWED_ORIGINS` env var to `docker-compose.dev.yml`
 
 ### Security
-
-#### Backend
-- Pin Swagger UI CDN resources to exact version (5.18.2) with Subresource Integrity hashes
+- Pin Swagger UI CDN to exact version (5.18.2) with Subresource Integrity hashes
 - Remove wildcard `Access-Control-Allow-Origin: *` from OpenAPI YAML endpoint
 - Add JWT `Issuer` claim for token provenance verification
 - Sanitize feed error messages to prevent internal network information leakage
+- Block `<style>` tags in DOMPurify sanitizer to prevent CSS injection from feeds
 - Limit regex filter patterns to 200 characters to mitigate CPU-based DoS
-- Add semaphore to `FetchFeedNow` to limit concurrent immediate fetches (max 5)
-
-#### Frontend
-- Pin Swagger UI CDN resources to exact version with SRI hashes (matching backend)
-- Use `fetch` with `keepalive: true` instead of `sendBeacon` for read tracking to preserve JWT auth header
+- Add semaphore to `FetchFeedNow` to cap concurrent immediate fetches at 5
+- Use `fetch` with `keepalive` instead of `sendBeacon` to preserve auth headers on page unload
 
 ### Performance
-
-#### Backend
-- Reuse HTTP connections via shared transport with connection pooling (was creating new client per request)
-- Skip readability extraction for articles that already exist (check GUID before expensive HTTP fetch)
-- Optimize `ListFeeds` unread count query from N correlated subqueries to single `LEFT JOIN` + `GROUP BY`
-- Wrap `UpdateSettings` in a single transaction instead of N separate write transactions
-- Add lightweight `ArticleBelongsToUser` ownership check for tags/events handlers (avoids fetching full article content)
+- Reuse HTTP connections via shared transport with connection pooling
+- Skip readability extraction for articles that already exist (GUID check before fetch)
+- Optimize `ListFeeds` unread count from N correlated subqueries to single `LEFT JOIN`
+- Wrap `UpdateSettings` in a single transaction instead of N separate writes
+- Add lightweight ownership check for tags/events (avoids fetching full article content)
 - Run thumbnail backfill concurrently with first feed fetch on startup
-
-#### Frontend
-- Throttle article reader scroll handler via `requestAnimationFrame` to prevent excessive re-renders
-- Parallelize initial API loads (feeds, categories, articles) instead of sequential waterfall
+- Throttle article reader scroll handler via `requestAnimationFrame`
+- Parallelize initial API loads (feeds, categories, articles) instead of waterfall
 - Replace render-blocking CSS `@import` for Google Font with non-blocking `<link preload>`
 
 ## [1.0.0] - 2026-03-08

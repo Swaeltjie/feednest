@@ -41,8 +41,17 @@ export function setupKeyboardShortcuts(shortcuts: KeyboardShortcuts) {
 			}
 		}
 
-		// Check if this key starts a possible chord
 		const lowerKey = key.toLowerCase();
+
+		// Exact-case shortcuts (e.g. Shift+G registered as 'G') take priority and
+		// must not be swallowed by chord buffering on the lowercase prefix.
+		if (key !== lowerKey && shortcuts[key]) {
+			e.preventDefault();
+			shortcuts[key](e);
+			return;
+		}
+
+		// Check if this key starts a possible chord
 		const possibleChords = Object.keys(shortcuts).filter(
 			(k) => k.length === 2 && k.startsWith(lowerKey) && !k.includes('+')
 		);
@@ -85,5 +94,12 @@ export function setupKeyboardShortcuts(shortcuts: KeyboardShortcuts) {
 	};
 
 	document.addEventListener('keydown', handler);
-	return () => document.removeEventListener('keydown', handler);
+	return () => {
+		document.removeEventListener('keydown', handler);
+		if (chordTimeout) {
+			clearTimeout(chordTimeout);
+			chordTimeout = null;
+		}
+		chordBuffer = '';
+	};
 }

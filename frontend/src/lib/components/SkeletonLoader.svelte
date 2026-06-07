@@ -7,7 +7,7 @@
 	<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
 		{#each [0, 1, 2] as i}
 			<div
-				class="rounded-2xl overflow-hidden fade-in-up"
+				class="relative rounded-2xl overflow-hidden fade-in-up"
 				style="animation-delay: {i * 80}ms; min-height: 280px;"
 			>
 				<div class="skeleton w-full h-full" style="min-height: 280px;"></div>

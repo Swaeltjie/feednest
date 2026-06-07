@@ -97,6 +97,9 @@ function createArticlesStore() {
 			if (currentLength >= currentTotal) return;
 
 			const thisLoadMore = ++loadMoreId;
+			// Capture the current load generation so a concurrent load() that
+			// resets the list invalidates this in-flight loadMore.
+			const loadGen = loadId;
 			update((s) => ({ ...s, loadingMore: true }));
 
 			const nextPage = Math.floor(currentLength / PAGE_SIZE) + 1;
@@ -105,7 +108,7 @@ function createArticlesStore() {
 
 			try {
 				const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);
-				if (thisLoadMore !== loadMoreId) return;
+				if (thisLoadMore !== loadMoreId || loadGen !== loadId) return;
 				update((s) => {
 					const existing = new Set(s.articles.map((a) => a.id));
 					const newArticles = (data.articles || []).filter((a) => !existing.has(a.id));
@@ -117,7 +120,7 @@ function createArticlesStore() {
 					};
 				});
 			} catch {
-				if (thisLoadMore !== loadMoreId) return;
+				if (thisLoadMore !== loadMoreId || loadGen !== loadId) return;
 				update((s) => ({ ...s, loadingMore: false }));
 			}
 		},

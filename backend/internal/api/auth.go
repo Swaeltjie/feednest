@@ -21,6 +21,12 @@ import (
 
 var usernameRe = regexp.MustCompile(`^[a-zA-Z0-9_\-\.]+$`)
 
+// dummyHash is a precomputed bcrypt hash used to perform a constant-time-ish
+// comparison when a login is attempted for a non-existent user. Running bcrypt
+// in both the user-found and user-not-found paths prevents username enumeration
+// via response-timing differences.
+var dummyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+
 type Claims struct {
 	UserID    int64  `json:"user_id"`
 	TokenType string `json:"token_type"`
@@ -167,6 +173,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.store.GetUserByUsername(req.Username)
 	if err != nil {
+		// Perform a dummy bcrypt comparison so that the response time for a
+		// non-existent username matches that of an existing one, preventing
+		// username enumeration via timing analysis.
+		checkPassword(req.Password, dummyHash)
 		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 		return
 	}
@@ -212,13 +222,15 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := generateToken(claims.UserID, h.jwtSecret, 24*time.Hour, "access")
+	// Verify the user still exists before issuing a new access token. A
+	// still-valid refresh token for a deleted account must not be honoured.
+	user, err := h.store.GetUserByID(claims.UserID)
 	if err != nil {
-		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		http.Error(w, `{"error":"invalid refresh token"}`, http.StatusUnauthorized)
 		return
 	}
 
-	user, err := h.store.GetUserByID(claims.UserID)
+	accessToken, err := generateToken(claims.UserID, h.jwtSecret, 24*time.Hour, "access")
 	if err != nil {
 		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 		return

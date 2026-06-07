@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -209,6 +210,17 @@ func (h *ArticleHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify ownership before mutating state or recording an event, since
+	// UpdateArticle/CreateReadingEvent succeed silently for non-matching ids.
+	if ok, err := h.store.ArticleBelongsToUser(id, userID); err != nil || !ok {
+		if errors.Is(err, sql.ErrNoRows) || !ok {
+			http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		} else {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		}
+		return
+	}
+
 	isRead := true
 	if err := h.store.UpdateArticle(id, userID, &isRead, nil); err != nil {
 		http.Error(w, `{"error":"failed to dismiss article"}`, http.StatusInternalServerError)
@@ -229,7 +241,8 @@ func (h *ArticleHandler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
 		FeedID     *int64 `json:"feed_id"`
 		CategoryID *int64 `json:"category_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// An empty body is valid and means "mark everything read".
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
 		return
 	}

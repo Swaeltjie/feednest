@@ -72,6 +72,11 @@ func (s *Scheduler) backfillThumbnails() {
 		go func(id int64, articleURL string) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("scheduler: recovered from panic backfilling thumbnail for article %d: %v", id, r)
+				}
+			}()
 
 			result, err := readability.Extract(articleURL)
 			if err != nil || result.ThumbnailURL == "" {
@@ -98,6 +103,11 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string, userID int64) {
 	go func() {
 		s.fetchSem <- struct{}{}
 		defer func() { <-s.fetchSem }()
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("scheduler: recovered from panic during immediate fetch of feed %d (%s): %v", feedID, feedURL, r)
+			}
+		}()
 		result, err := fetcher.FetchFeed(feedURL)
 		if err != nil {
 			log.Printf("scheduler: immediate fetch failed for %s: %v", feedURL, err)
@@ -183,6 +193,11 @@ func (s *Scheduler) fetchAll() {
 		go func(feedID, userID int64, feedURL, feedTitle string) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("scheduler: recovered from panic fetching feed %d (%s): %v", feedID, feedURL, r)
+				}
+			}()
 
 			result, err := fetcher.FetchFeed(feedURL)
 			if err != nil {

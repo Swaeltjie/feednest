@@ -48,13 +48,18 @@ function createSettingsStore() {
 		});
 	}
 
+	function pick<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+		const v = ls(key);
+		return (v && (allowed as readonly string[]).includes(v)) ? (v as T) : fallback;
+	}
+
 	const stored = ls('feednest_theme');
 	const initial: SettingsState = {
 		theme: (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'system',
-		readerFontSize: (ls('feednest_reader_font_size') as ReaderFontSize) || 'medium',
-		readerFontFamily: (ls('feednest_reader_font_family') as ReaderFontFamily) || 'sans',
-		readerLineHeight: (ls('feednest_reader_line_height') as ReaderLineHeight) || 'comfortable',
-		readerContentWidth: (ls('feednest_reader_content_width') as ReaderContentWidth) || 'medium',
+		readerFontSize: pick('feednest_reader_font_size', ['small', 'medium', 'large', 'xl'], 'medium'),
+		readerFontFamily: pick('feednest_reader_font_family', ['sans', 'serif', 'mono'], 'sans'),
+		readerLineHeight: pick('feednest_reader_line_height', ['compact', 'comfortable', 'spacious'], 'comfortable'),
+		readerContentWidth: pick('feednest_reader_content_width', ['narrow', 'medium', 'wide'], 'medium'),
 		calmMode: ls('feednest_calm_mode') === 'true',
 		autoMarkReadOnScroll: ls('feednest_auto_mark_read_scroll') === 'true',
 		infiniteScroll: ls('feednest_infinite_scroll') !== 'false',

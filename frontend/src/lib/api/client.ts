@@ -44,11 +44,19 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 				headers,
 				body: body !== undefined ? JSON.stringify(body) : undefined,
 			});
-			if (!retry.ok) throw new Error(`API error: ${retry.status}`);
-			if (retry.status === 204) return undefined as T;
-			return retry.json();
+			// A 401 after a fresh token means the session is genuinely invalid —
+			// fall through to the session-expiry handling below instead of
+			// throwing a generic error and leaving the app in a broken state.
+			if (retry.status !== 401) {
+				if (!retry.ok) {
+					const err = await retry.json().catch(() => ({ error: `HTTP ${retry.status}` }));
+					throw new Error(err.error || `API error: ${retry.status}`);
+				}
+				if (retry.status === 204) return undefined as T;
+				return retry.json();
+			}
 		}
-		// Refresh failed — clear auth state and redirect to login
+		// Refresh failed (or retry still unauthorized) — clear auth state and redirect to login
 		if (typeof localStorage !== 'undefined') {
 			localStorage.removeItem('feednest_refresh_token');
 		}

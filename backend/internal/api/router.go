@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -90,7 +91,10 @@ func rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Handler {
 			// If behind a trusted reverse proxy, configure TRUSTED_PROXY_IPS to allow forwarded IPs.
 			ip := r.RemoteAddr
 			if trustedProxies := os.Getenv("TRUSTED_PROXY_IPS"); trustedProxies != "" {
-				remoteIP := strings.Split(r.RemoteAddr, ":")[0]
+				remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
+				if err != nil {
+					remoteIP = r.RemoteAddr
+				}
 				for _, trusted := range strings.Split(trustedProxies, ",") {
 					if strings.TrimSpace(trusted) == remoteIP {
 						if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
@@ -141,7 +145,12 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 
 	allowedOrigins := []string{"http://localhost:5173", "http://localhost:3000"}
 	if origins := os.Getenv("ALLOWED_ORIGINS"); origins != "" {
-		allowedOrigins = strings.Split(origins, ",")
+		allowedOrigins = nil
+		for _, o := range strings.Split(origins, ",") {
+			if o = strings.TrimSpace(o); o != "" {
+				allowedOrigins = append(allowedOrigins, o)
+			}
+		}
 	}
 
 	r.Use(cors.Handler(cors.Options{

@@ -126,6 +126,11 @@
 		min_reading_time: sidebarView === 'long_reads' ? 10 : undefined,
 	});
 
+	// Count of rendered articles; changes only when items are added/removed,
+	// not when an article's read/star flags toggle. Used to re-attach the
+	// auto-mark-read observer after infinite scroll loads more.
+	let articleCount = $derived($articles.articles.length);
+
 	let featuredArticles = $derived(
 		viewMode === 'hybrid'
 			? $articles.articles.filter((a) => a.thumbnail_url).slice(0, FEATURED_COUNT)
@@ -485,6 +490,11 @@
 	$effect(() => {
 		if (!$settings.autoMarkReadOnScroll || openArticleId !== null) return;
 
+		// Re-run (and re-observe) whenever the number of rendered articles
+		// changes, e.g. after infinite-scroll loads more into the DOM.
+		void articleCount;
+
+		let cancelled = false;
 		const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
 		const observer = new IntersectionObserver(
@@ -522,11 +532,13 @@
 
 		// Observe all article elements
 		requestAnimationFrame(() => {
+			if (cancelled) return;
 			const elements = document.querySelectorAll('[data-article-id]');
 			elements.forEach((el) => observer.observe(el));
 		});
 
 		return () => {
+			cancelled = true;
 			observer.disconnect();
 			for (const timer of timers.values()) {
 				clearTimeout(timer);

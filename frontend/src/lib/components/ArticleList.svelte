@@ -48,7 +48,9 @@
 	let feedAccentColor = $state('');
 
 	$effect(() => {
-		getFeedColor(article.feed_icon_url, article.url).then(c => { feedAccentColor = c; });
+		let cancelled = false;
+		getFeedColor(article.feed_icon_url, article.url).then(c => { if (!cancelled) feedAccentColor = c; });
+		return () => { cancelled = true; };
 	});
 </script>
 

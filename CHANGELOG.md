@@ -5,6 +5,35 @@ All notable changes to FeedNest will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-06-07
+
+### Fixed
+- Backend: equalize bcrypt timing on login to prevent username enumeration via response timing
+- Backend: return 401 instead of 500 when refreshing a token for a deleted user
+- Backend: trim `ALLOWED_ORIGINS` entries so whitespace around comma-separated origins no longer breaks CORS
+- Backend: parse the proxy remote address with `net.SplitHostPort` so trusted IPv6 proxies are matched correctly
+- Backend: enforce per-user ownership in the article dismiss endpoint (prevents writing reading events for another user's articles)
+- Backend: accept an empty request body in "mark all read"
+- Backend: recover from panics in the feed/article worker goroutines so a malformed or hostile feed cannot crash the server
+- Frontend: route a persistent 401 after token refresh to session-expiry/login instead of leaving the app in a stuck state
+- Frontend: guard `loadMore` against a concurrent `load()` so stale pages are no longer appended after a filter/sort change
+- Frontend: validate reader settings restored from `localStorage` against allowed values
+- Frontend: cancel stale async feed-color fetches in the article card/list (fixes wrong accent colors on recycled cards)
+- Frontend: fix hybrid skeleton-loader positioning
+- Frontend: re-attach the `IntersectionObserver` to infinite-scroll-loaded articles so auto-mark-read works beyond the first page
+- Frontend: fix the `Shift+G` shortcut being swallowed by the `gg` chord prefix
+- Frontend: clear the pending keyboard-chord timer on teardown to avoid work against a destroyed component
+- Frontend: stop rendering "Invalid Date" for unparseable timestamps
+
+### Security
+- Backend: upgrade dependencies to latest — chi 5.2.5 → 5.3.0, go-sqlite3 1.14.34 → 1.14.45, golang.org/x/crypto 0.48 → 0.52, x/net 0.51 → 0.55, x/text 0.34 → 0.37, goquery/cascadia bumped; `govulncheck` reports no known vulnerabilities
+- Backend: migrate the deprecated `github.com/go-shiori/go-readability` to its maintained successor `codeberg.org/readeck/go-readability/v2` (v2.1.1)
+- Frontend: upgrade dependencies to latest — vite 7 → 8, @sveltejs/vite-plugin-svelte 6 → 7, @sveltejs/kit → 2.63, svelte → 5.56, vitest → 4.1, svelte-check → 4.6, tailwindcss → 4.3, isomorphic-dompurify 3.0.0 → 3.16, jsdom/typescript bumped; `npm audit` reports 0 vulnerabilities (resolves the prior high-severity vite dev-server and moderate postcss advisories)
+
+### Changed
+- Frontend: add an explicit `@types/node` dev dependency (previously only present transitively)
+- Frontend: set `legacy-peer-deps=true` in `.npmrc` so `npm ci` (Docker build, CI) resolves vite 8 / plugin 7 under the current `@sveltejs/kit` the same way as local installs
+
 ## [1.0.1] - 2026-03-27
 
 ### Changed

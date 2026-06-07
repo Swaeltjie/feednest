@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/feednest/backend/internal/urlutil"
-	goreadability "github.com/go-shiori/go-readability"
+	goreadability "codeberg.org/readeck/go-readability/v2"
 )
 
 const maxArticleResponseSize = 5 * 1024 * 1024 // 5MB
@@ -136,13 +136,19 @@ func tryExtract(articleURL string, parsedURL *url.URL, strategy extractionStrate
 		return nil, fmt.Errorf("strategy %s: readability error: %w", strategy.name, err)
 	}
 
-	content := article.Content
+	var contentBuf bytes.Buffer
+	if article.Node != nil {
+		if err := article.RenderHTML(&contentBuf); err != nil {
+			return nil, fmt.Errorf("strategy %s: readability render error: %w", strategy.name, err)
+		}
+	}
+	content := contentBuf.String()
 	if IsBlockedContent(content) {
 		return nil, fmt.Errorf("strategy %s: content is bot-protection page for %s", strategy.name, articleURL)
 	}
 
-	// Extract thumbnail: go-readability Image > og:image from raw HTML > first <img> in content
-	thumbnail := article.Image
+	// Extract thumbnail: go-readability ImageURL > og:image from raw HTML > first <img> in content
+	thumbnail := article.ImageURL()
 	if thumbnail == "" {
 		thumbnail = ExtractThumbnailFromHTML(rawHTML)
 	}

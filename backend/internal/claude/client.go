@@ -3,8 +3,9 @@
 // Two auth modes are supported:
 //   - API key (default, supported): set ANTHROPIC_API_KEY.
 //   - OAuth subscription token (opt-in): mount a Claude Code credentials file
-//     (~/.claude/.credentials.json). The access token is sent as x-api-key with
-//     the oauth beta headers and auto-refreshed. See oauth.go for the ToS note.
+//     (~/.claude/.credentials.json). The access token is sent as an
+//     Authorization: Bearer token with the oauth beta headers and auto-refreshed.
+//     See oauth.go for the ToS note.
 //
 // Model defaults to claude-haiku-4-5 (cheap, fast — appropriate for the
 // high-volume summarization use case), overridable via CLAUDE_SUMMARY_MODEL.
@@ -86,10 +87,12 @@ func New() *Client {
 			if err != nil {
 				return nil, fmt.Errorf("claude oauth token: %w", err)
 			}
-			// OAuth tokens authenticate via x-api-key (Bearer is rejected) plus
-			// the oauth beta headers.
-			req.Header.Set("x-api-key", tok)
-			req.Header.Del("authorization")
+			// Claude Code OAuth subscription tokens authenticate via
+			// Authorization: Bearer plus the oauth beta headers. Sending them as
+			// x-api-key returns 401 "invalid x-api-key". Drop the SDK's
+			// placeholder x-api-key and set the bearer token instead.
+			req.Header.Del("X-Api-Key")
+			req.Header.Set("Authorization", "Bearer "+tok)
 			req.Header.Set("anthropic-beta", oauthBetaHeaders)
 			return next(req)
 		}

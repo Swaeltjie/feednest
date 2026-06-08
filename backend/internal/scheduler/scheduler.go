@@ -18,6 +18,7 @@ type Scheduler struct {
 	stopOnce    sync.Once
 	fetchSem    chan struct{} // limits concurrent immediate fetches
 	backfilling atomic.Bool   // ensures only one thumbnail backfill runs at a time
+	rescoring   atomic.Bool   // ensures only one engagement/score rescore runs at a time
 }
 
 func New(store *store.Queries, interval time.Duration) *Scheduler {
@@ -32,6 +33,7 @@ func New(store *store.Queries, interval time.Duration) *Scheduler {
 func (s *Scheduler) Start() {
 	go func() {
 		go s.backfillThumbnails() // run concurrently, don't block first fetch
+		go s.rescore()            // populate engagement + article scores
 		s.fetchAll()
 
 		ticker := time.NewTicker(s.interval)
@@ -44,6 +46,9 @@ func (s *Scheduler) Start() {
 				// Self-heal any articles still missing a thumbnail (e.g. a
 				// transient extraction failure at ingest time).
 				go s.backfillThumbnails()
+				// Recompute feed engagement and article scores so the
+				// "smart" sort reflects recent reading behaviour.
+				go s.rescore()
 			case <-s.stop:
 				return
 			}
@@ -104,6 +109,34 @@ func (s *Scheduler) backfillThumbnails() {
 
 	wg.Wait()
 	log.Printf("scheduler: backfilled %d/%d thumbnails", filled.Load(), len(articles))
+}
+
+// rescore recomputes per-feed engagement scores from recent reading behaviour
+// and then re-scores recent articles for the "smart" sort. It is guarded so
+// overlapping invocations (startup + periodic) don't duplicate work. Engagement
+// is updated first because article scoring reads feeds.engagement_score.
+func (s *Scheduler) rescore() {
+	if !s.rescoring.CompareAndSwap(false, true) {
+		return
+	}
+	defer s.rescoring.Store(false)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("scheduler: recovered from panic during rescore: %v", r)
+		}
+	}()
+
+	if err := s.store.UpdateFeedEngagementScores(); err != nil {
+		log.Printf("scheduler: failed to update feed engagement scores: %v", err)
+		return
+	}
+
+	scored, err := s.store.ScoreRecentArticles()
+	if err != nil {
+		log.Printf("scheduler: failed to score recent articles: %v", err)
+		return
+	}
+	log.Printf("scheduler: rescored %d recent articles", scored)
 }
 
 func (s *Scheduler) Stop() {

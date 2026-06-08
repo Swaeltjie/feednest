@@ -852,3 +852,56 @@ paths:
             application/xml:
               schema:
                 type: string
+
+  /api/ask:
+    post:
+      summary: Ask your feeds (AI, RAG)
+      description: >-
+        Answer a natural-language question grounded in the user's own article
+        archive. Retrieves the most relevant article passages via the FTS5 index
+        and asks Claude to answer using only those passages, returning the answer
+        with the source articles it drew from. Requires AI to be configured
+        (see GET /api/summary/config); returns 503 otherwise.
+      tags: [AI]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  maxLength: 1000
+                  example: What did my feeds say about AI this week?
+      responses:
+        '200':
+          description: Grounded answer with cited sources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  answer:
+                    type: string
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          format: int64
+                        title:
+                          type: string
+                        url:
+                          type: string
+                        feed_title:
+                          type: string
+        '400':
+          description: Empty or too-long question
+        '503':
+          description: AI features are not configured

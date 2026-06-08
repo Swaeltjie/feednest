@@ -9,11 +9,12 @@
 		collapsed = false,
 		activeFeed = null as number | null,
 		activeCategory = null as number | null,
-		activeView = 'all' as 'all' | 'starred' | 'today' | 'long_reads' | 'feed' | 'category',
+		activeView = 'all' as 'all' | 'starred' | 'today' | 'best_of' | 'long_reads' | 'feed' | 'category',
 		onSelectAll = () => {},
 		onSelectStarred = () => {},
 		onSelectToday = () => {},
 		onSelectLongReads = () => {},
+		onSelectBestOf = () => {},
 		onSelectFeed = (_id: number) => {},
 		onSelectCategory = (_id: number) => {},
 		onAddFeed = () => {},
@@ -23,11 +24,12 @@
 		collapsed?: boolean;
 		activeFeed?: number | null;
 		activeCategory?: number | null;
-		activeView?: 'all' | 'starred' | 'today' | 'long_reads' | 'feed' | 'category';
+		activeView?: 'all' | 'starred' | 'today' | 'best_of' | 'long_reads' | 'feed' | 'category';
 		onSelectAll?: () => void;
 		onSelectStarred?: () => void;
 		onSelectToday?: () => void;
 		onSelectLongReads?: () => void;
+		onSelectBestOf?: () => void;
 		onSelectFeed?: (id: number) => void;
 		onSelectCategory?: (id: number) => void;
 		onAddFeed?: () => void;
@@ -329,7 +331,21 @@
 			Long Reads
 		</button>
 
-		<div class="my-2.5 mx-2 border-t border-[var(--color-border)]"></div>
+		<!-- Best Of -->
+			<button
+				onclick={onSelectBestOf}
+				class="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-left transition-all rounded-xl
+					{activeView === 'best_of'
+						? 'glow-active text-[var(--color-accent)]'
+						: 'text-[var(--color-text-secondary)] hover:bg-[var(--color-elevated)] hover:text-[var(--color-text-primary)]'}"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+				</svg>
+				Best Of
+			</button>
+
+			<div class="my-2.5 mx-2 border-t border-[var(--color-border)]"></div>
 
 		<!-- Categorized feeds -->
 		{#each feedsByCategory.grouped as { category, feeds: catFeeds }}

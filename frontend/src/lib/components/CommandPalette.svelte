@@ -30,6 +30,8 @@
 		onOpenExternal,
 		onOpenRules,
 		onOpenHealth,
+		onOpenAsk,
+		aiEnabled = false,
 	}: {
 		open: boolean;
 		onSelectFeed?: (id: number) => void;
@@ -47,6 +49,8 @@
 		onOpenExternal?: () => void;
 		onOpenRules?: () => void;
 		onOpenHealth?: () => void;
+		onOpenAsk?: () => void;
+		aiEnabled?: boolean;
 	} = $props();
 
 	let query = $state('');
@@ -155,6 +159,16 @@
 		});
 
 		// ── Actions ──
+
+			if (aiEnabled) {
+				items.push({
+					id: 'action-ask',
+					label: 'Ask Your Feeds',
+					category: 'action',
+					icon: '✨',
+					action: () => { onOpenAsk?.(); close(); }
+				});
+			}
 		items.push({
 			id: 'action-refresh',
 			label: 'Refresh Feeds',

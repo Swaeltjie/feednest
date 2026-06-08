@@ -7,6 +7,7 @@
 	import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
+	import AskModal from '$lib/components/AskModal.svelte';
 	import KeyboardHints from '$lib/components/KeyboardHints.svelte';
 	import FilterRules from '$lib/components/FilterRules.svelte';
 	import FeedHealth from '$lib/components/FeedHealth.svelte';
@@ -19,7 +20,7 @@
 	type ViewMode = 'hybrid' | 'cards' | 'list';
 	type FilterTab = 'all' | 'unread' | 'starred';
 	type SortOption = 'smart' | 'newest' | 'oldest';
-	type SidebarView = 'all' | 'starred' | 'today' | 'long_reads' | 'feed' | 'category';
+	type SidebarView = 'all' | 'starred' | 'today' | 'best_of' | 'long_reads' | 'feed' | 'category';
 
 	let sidebarCollapsed = $state(false);
 	let mobileMenuOpen = $state(false);
@@ -55,6 +56,8 @@
 	let keyboardHintsOpen = $state(false);
 	let filterRulesOpen = $state(false);
 	let feedHealthOpen = $state(false);
+	let askOpen = $state(false);
+	let aiEnabled = $state(false);
 	let scrollY = $state(0);
 	let headerCompact = $derived(scrollY > 80);
 	let focusMode = $state(false);
@@ -120,11 +123,14 @@
 
 	let currentFilters = $derived<ArticleFilters>({
 		status: filterTab === 'unread' ? 'unread' : filterTab === 'starred' ? 'starred' : undefined,
-		sort: sortOption,
+		sort: sidebarView === 'best_of' ? 'smart' : sortOption,
 		feed: sidebarView === 'feed' && activeFeedId ? activeFeedId : undefined,
 		category: sidebarView === 'category' && activeCategoryId ? activeCategoryId : undefined,
 		search: debouncedSearch || undefined,
-		published_after: sidebarView === 'today' ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() : undefined,
+		published_after:
+			sidebarView === 'today' ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+			: sidebarView === 'best_of' ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+			: undefined,
 		min_reading_time: sidebarView === 'long_reads' ? 10 : undefined,
 	});
 
@@ -201,6 +207,14 @@
 
 	function selectLongReads() {
 		sidebarView = 'long_reads';
+		activeFeedId = null;
+		activeCategoryId = null;
+		filterTab = 'all';
+		mobileMenuOpen = false;
+	}
+
+	function selectBestOf() {
+		sidebarView = 'best_of';
 		activeFeedId = null;
 		activeCategoryId = null;
 		filterTab = 'all';
@@ -353,6 +367,8 @@
 		} finally {
 			initialized = true;
 		}
+
+		api.get<{ enabled: boolean }>('/api/summary/config').then((c) => { aiEnabled = c.enabled; }).catch(() => {});
 
 		cleanupKeyboard = setupKeyboardShortcuts({
 			j: (e) => {
@@ -561,6 +577,7 @@
 		if (sidebarView === 'starred') return 'Starred';
 		if (sidebarView === 'today') return 'Today';
 		if (sidebarView === 'long_reads') return 'Long Reads';
+		if (sidebarView === 'best_of') return 'Best Of';
 		if (sidebarView === 'feed' && activeFeedId) {
 			const feed = $feeds.find((f) => f.id === activeFeedId);
 			return feed?.title || 'Feed';
@@ -598,6 +615,7 @@
 					onSelectStarred={selectStarred}
 					onSelectToday={selectToday}
 					onSelectLongReads={selectLongReads}
+					onSelectBestOf={selectBestOf}
 					onSelectFeed={selectFeed}
 					onSelectCategory={selectCategory}
 					onAddFeed={openAddFeed}
@@ -619,6 +637,7 @@
 			onSelectStarred={selectStarred}
 			onSelectToday={selectToday}
 			onSelectLongReads={selectLongReads}
+					onSelectBestOf={selectBestOf}
 			onSelectFeed={selectFeed}
 			onSelectCategory={selectCategory}
 			onAddFeed={openAddFeed}
@@ -711,7 +730,20 @@
 				</div>
 
 				<div class="flex items-center gap-3">
-					<!-- Refresh countdown -->
+											{#if aiEnabled}
+							<button
+								onclick={() => (askOpen = true)}
+								class="group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--color-elevated)] text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)]"
+								title="Ask your feeds (AI)"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+								</svg>
+								<span class="hidden sm:inline">Ask</span>
+							</button>
+						{/if}
+
+						<!-- Refresh countdown -->
 					<button
 						onclick={async () => { refreshCountdown = 300; await feeds.load(); await articles.load(currentFilters); }}
 						class="group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all
@@ -1026,9 +1058,13 @@
 	}}
 	onOpenRules={() => { filterRulesOpen = true; }}
 	onOpenHealth={() => { feedHealthOpen = true; }}
+		onOpenAsk={() => { if (aiEnabled) askOpen = true; }}
+		{aiEnabled}
 />
 
 <!-- Keyboard Hints -->
+<AskModal bind:open={askOpen} onOpenArticle={openArticle} />
+
 <KeyboardHints bind:open={keyboardHintsOpen} />
 
 <!-- Filter Rules -->

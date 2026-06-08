@@ -5,6 +5,12 @@ All notable changes to FeedNest will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Best Of — smart ranking activated** — the article scorer is now live. A background pass (on the existing feed-refresh schedule) computes a per-feed engagement score from your own `reading_events` (read-through rate, read depth vs. article length, click signal, dismiss penalty over a 90-day window) and writes a recency-plus-engagement `score` to recent articles. A new **Best Of** sidebar view surfaces the top-ranked articles from the last 7 days (`GET /api/articles?sort=smart&published_after=...`), and the existing **Smart** sort now reflects real signal everywhere instead of always ordering by date. All ranking is computed and stored locally — no behavior leaves your instance. (Previously `scorer.CalculateScore`, `articles.score`, and `feeds.engagement_score` were dead code.)
+- **Ask Your Feeds — AI answers grounded in your archive** — a new **Ask** button (and command-palette action) opens a prompt that answers natural-language questions about your subscriptions. Relevant article passages are retrieved from the existing FTS5 index (no embeddings, no vector DB) and sent to Claude, which answers using only those passages and returns inline `[n]` citations linking to the source articles. New endpoint `POST /api/ask`; shares the AI gate with summaries (`GET /api/summary/config`), so it appears only when `ANTHROPIC_API_KEY` (or OAuth) is configured.
+
 ## [1.0.3] - 2026-06-08
 
 ### Added

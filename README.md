@@ -62,7 +62,7 @@ Open **http://localhost:3000**, create your account, and start reading. That's i
 - **Inline reading pane** — split-pane layout keeps the article list visible while you read
 - **Focus mode** — press `f` to go full-width for distraction-free reading
 - **Three view modes** — Hybrid (hero cards + dense list), Card grid, or compact List
-- **Smart ranking** — articles scored by recency (60%) and engagement (40%) with exponential decay
+- **Smart ranking** — articles scored by your own reading behavior (recency 60% + per-feed engagement 40%, exponential decay); powers Smart sort and the **Best Of** view
 - **Customizable reader** — font size, font family, line height, and content width
 - **Content extraction** — pulls full articles even from summary-only feeds
 - **Reading progress bar** — gradient bar tracks your scroll position
@@ -85,7 +85,7 @@ Open **http://localhost:3000**, create your account, and start reading. That's i
 ### 🗂 Organization
 
 - **Categories & tags** — drag-and-drop categories, rename feeds/categories inline, tag articles
-- **Smart feeds** — Starred, Today (last 24h), and Long Reads (10+ min) built-in views
+- **Smart feeds** — Starred, Today (last 24h), Long Reads (10+ min), and **Best Of** (top-ranked picks from the last 7 days) built-in views
 - **Filter rules** — hide, auto-read, or auto-star articles by title, author, or content (regex supported)
 - **Cross-feed deduplication** — same article in multiple feeds? You'll only see it once
 - **Ad filtering** — automatically hides sponsored posts and bot-protection pages
@@ -100,6 +100,7 @@ Open **http://localhost:3000**, create your account, and start reading. That's i
 - **Command palette** — `Ctrl+K` for everything: navigation, views, sorting, feeds, actions
 - **Full-text search (FTS5)** — fast SQLite FTS5 search with stemming and highlighted matches
 - **AI summaries** — optional Claude-powered TL;DR for any article (bring your own API key)
+- **Ask your feeds** — ask a natural-language question and get a Claude answer grounded in your own articles, with citations (FTS5 retrieval — no embeddings, no external index)
 - **Installable PWA** — add to home screen; offline reading of already-loaded articles
 - **Feed health dashboard** — per-feed status, last-fetch errors, dead-feed detection, retry
 - **Keyboard-first** — vim-style navigation, chord sequences (`gg`, `G`), single-key actions

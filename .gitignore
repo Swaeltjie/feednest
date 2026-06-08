@@ -56,3 +56,7 @@ feed-state.jpeg
 # Tooling caches / artifacts
 .codegraph/
 .playwright-mcp/
+
+# Local Claude OAuth creds + override (never commit)
+.claude-credentials.json
+docker-compose.override.yml

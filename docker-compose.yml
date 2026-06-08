@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/swaeltjie/feednest-backend:1.0.2
+    image: ghcr.io/swaeltjie/feednest-backend:1.0.3
     ports:
       - "127.0.0.1:8082:8080"
     volumes:
@@ -10,6 +10,9 @@ services:
       - JWT_SECRET=${JWT_SECRET:-}
       - PORT=8080
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      # Optional: enable AI article summaries (Claude). Leave unset to disable.
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CLAUDE_SUMMARY_MODEL=${CLAUDE_SUMMARY_MODEL:-claude-haiku-4-5}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
       interval: 30s
@@ -18,7 +21,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/swaeltjie/feednest-frontend:1.0.2
+    image: ghcr.io/swaeltjie/feednest-frontend:1.0.3
     ports:
       - "127.0.0.1:3000:3000"
     environment:

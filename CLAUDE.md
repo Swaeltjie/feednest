@@ -119,14 +119,21 @@ $effect(() => {
 | PUT | /api/feeds/{id} | Update feed (title, category_id, fetch_interval) |
 | GET | /api/articles | List articles (params: status, sort, feed, category, tag, search, page, limit) |
 | POST | /api/articles/bulk | Bulk mark_read/mark_unread/star/unstar |
+| POST | /api/articles/{id}/summary | Generate/return cached AI TL;DR (Claude) |
+| GET | /api/summary/config | Whether AI summaries are configured (`{enabled, mode}`) |
+| GET | /api/image?url= | Public SSRF-protected image proxy for thumbnails |
 | GET | /api/categories | List categories |
+| GET/POST/PUT/DELETE | /api/rules | Filter rules (field/operator/action: hide, auto_read, auto_star) |
 | POST | /api/opml/import | Import OPML file |
 | GET | /api/opml/export | Export as OPML |
 
 ## Testing
 
 ```bash
-cd backend && go test ./...           # Run all backend tests
+# Backend uses the sqlite_fts5 build tag to enable full-text search (FTS5).
+# Without it, search silently falls back to LIKE — always pass the tag.
+cd backend && go build -tags sqlite_fts5 ./...   # Build
+cd backend && go test  -tags sqlite_fts5 ./...   # Run all backend tests
 cd frontend && npm test               # Run frontend unit tests (vitest)
 cd frontend && npm run check          # TypeScript + Svelte check
 ```
@@ -178,3 +185,7 @@ When making changes that warrant a new release:
 | DB_PATH | ./feednest.db | SQLite database path |
 | JWT_SECRET | *(auto-generated)* | JWT signing key — auto-generated and persisted if not set |
 | ORIGIN | http://localhost:3000 | SvelteKit origin (CSRF) |
+| ANTHROPIC_API_KEY | *(unset)* | Enables AI summaries (Claude). Recommended auth path |
+| CLAUDE_SUMMARY_MODEL | claude-haiku-4-5 | Model used for summaries |
+| CLAUDE_AUTH_MODE | *(auto)* | `apikey` or `oauth`; auto-detects an API key, else a mounted OAuth creds file |
+| CLAUDE_CREDENTIALS_PATH | ~/.claude/.credentials.json | OAuth mode: mounted Claude Code creds file (token auto-refreshed) |

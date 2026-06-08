@@ -190,14 +190,14 @@ func (q *Queries) GetArticle(id, userID int64) (*models.Article, error) {
 	err := q.db.QueryRow(`
 		SELECT a.id, a.feed_id, a.guid, a.title, a.url, a.author, a.content_raw, a.content_clean,
 			a.thumbnail_url, a.published_at, a.fetched_at, a.word_count, a.reading_time,
-			a.is_read, a.is_starred, a.read_at, a.score,
+			a.is_read, a.is_starred, a.read_at, a.score, COALESCE(a.summary, '') as summary,
 			COALESCE(f.title, '') as feed_title, COALESCE(f.icon_url, '') as feed_icon_url
 		FROM articles a
 		JOIN feeds f ON a.feed_id = f.id
 		WHERE a.id = ? AND f.user_id = ?`, id, userID,
 	).Scan(&a.ID, &a.FeedID, &a.GUID, &a.Title, &a.URL, &a.Author, &a.ContentRaw, &a.ContentClean,
 		&a.ThumbnailURL, &a.PublishedAt, &a.FetchedAt, &a.WordCount, &a.ReadingTime,
-		&a.IsRead, &a.IsStarred, &a.ReadAt, &a.Score, &a.FeedTitle, &a.FeedIconURL)
+		&a.IsRead, &a.IsStarred, &a.ReadAt, &a.Score, &a.Summary, &a.FeedTitle, &a.FeedIconURL)
 	if err != nil {
 		return nil, err
 	}
@@ -246,10 +246,17 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		args = append(args, filter.Tag)
 	}
 	if filter.Search != "" {
-		escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(filter.Search)
-		searchTerm := "%" + escaped + "%"
-		conditions = append(conditions, "(a.title LIKE ? ESCAPE '\\' OR a.content_clean LIKE ? ESCAPE '\\' OR a.content_raw LIKE ? ESCAPE '\\')")
-		args = append(args, searchTerm, searchTerm, searchTerm)
+		// Prefer FTS5 (stemming, token/phrase matching, relevance) when the
+		// SQLite build supports it; otherwise fall back to LIKE substring match.
+		if ftsMatch := buildFTSMatch(filter.Search); FTS5Enabled && ftsMatch != "" {
+			conditions = append(conditions, "a.id IN (SELECT rowid FROM articles_fts WHERE articles_fts MATCH ?)")
+			args = append(args, ftsMatch)
+		} else {
+			escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(filter.Search)
+			searchTerm := "%" + escaped + "%"
+			conditions = append(conditions, "(a.title LIKE ? ESCAPE '\\' OR a.content_clean LIKE ? ESCAPE '\\' OR a.content_raw LIKE ? ESCAPE '\\')")
+			args = append(args, searchTerm, searchTerm, searchTerm)
+		}
 	}
 	if filter.PublishedAfter != "" {
 		conditions = append(conditions, "COALESCE(a.published_at, a.fetched_at) >= ?")
@@ -438,6 +445,12 @@ func (q *Queries) UpdateArticleContent(id int64, contentClean string, wordCount,
 		`UPDATE articles SET content_clean = ?, word_count = ?, reading_time = ? WHERE id = ?`,
 		contentClean, wordCount, readingTime, id,
 	)
+	return err
+}
+
+// UpdateArticleSummary stores a cached AI-generated TL;DR for an article.
+func (q *Queries) UpdateArticleSummary(id int64, summary string) error {
+	_, err := q.db.Exec(`UPDATE articles SET summary = ? WHERE id = ?`, summary, id)
 	return err
 }
 

@@ -41,8 +41,8 @@
 
 	const actionLabels: Record<string, string> = {
 		hide: 'Hide',
-		mark_read: 'Auto mark read',
-		star: 'Auto star',
+		auto_read: 'Auto mark read',
+		auto_star: 'Auto star',
 	};
 
 	$effect(() => {
@@ -256,8 +256,8 @@
 									appearance-none cursor-pointer"
 							>
 								<option value="hide">Hide</option>
-								<option value="mark_read">Auto mark read</option>
-								<option value="star">Auto star</option>
+								<option value="auto_read">Auto mark read</option>
+								<option value="auto_star">Auto star</option>
 							</select>
 						</div>
 					</div>

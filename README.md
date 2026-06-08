@@ -98,7 +98,10 @@ Open **http://localhost:3000**, create your account, and start reading. That's i
 
 - **Glassmorphic design** — frosted glass toolbars, gradient accents, adaptive dark/light themes
 - **Command palette** — `Ctrl+K` for everything: navigation, views, sorting, feeds, actions
-- **Full-text search** — instant debounced search across all articles
+- **Full-text search (FTS5)** — fast SQLite FTS5 search with stemming and highlighted matches
+- **AI summaries** — optional Claude-powered TL;DR for any article (bring your own API key)
+- **Installable PWA** — add to home screen; offline reading of already-loaded articles
+- **Feed health dashboard** — per-feed status, last-fetch errors, dead-feed detection, retry
 - **Keyboard-first** — vim-style navigation, chord sequences (`gg`, `G`), single-key actions
 - **Spring animations** — physics-based motion with staggered entrances and parallax effects
 - **Dynamic feed colors** — accent colors extracted from feed favicons
@@ -112,8 +115,9 @@ Open **http://localhost:3000**, create your account, and start reading. That's i
 
 - **Single binary + SQLite** — no Postgres, no Redis, no external dependencies
 - **Multi-user** — JWT auth with automatic token refresh and auto-generated secrets
+- **Reliable images** — server-side image proxy defeats hotlink/ORB blocking that breaks thumbnails
 - **Rate limiting** — per-IP auth rate limiting with trusted proxy support
-- **SSRF protection** — blocks requests to private/internal networks
+- **SSRF protection** — blocks requests to private/internal networks (feeds and image proxy)
 - **XSS protection** — article content sanitized with DOMPurify
 - **Full REST API** — Swagger UI included at `/api/docs`
 
@@ -153,6 +157,8 @@ Open **http://localhost:3000**, create your account, and start reading. That's i
 | 🚀 | **Go 1.26** + Chi router | Fast, lightweight API server |
 | 💾 | **SQLite** (WAL mode) | Zero-config embedded database |
 | 📡 | **gofeed** + go-readability | RSS/Atom parsing + content extraction |
+| 🔎 | **SQLite FTS5** | Full-text article search with stemming |
+| 🤖 | **Anthropic Claude** (Haiku) | Optional AI article summaries |
 | 🔐 | **JWT** (HS256) | Stateless auth with refresh tokens |
 | 🐳 | **Docker Compose** | One-command deployment |
 | 🛡 | **DOMPurify** | XSS-safe article rendering |
@@ -184,6 +190,12 @@ cd frontend && npm install && npm run dev  # Frontend on :5173 with HMR
 | `ORIGIN` | `http://localhost:3000` | Public URL for CSRF protection — set via `.env` when using a reverse proxy |
 | `TRUSTED_PROXY_IPS` | — | Comma-separated IPs of trusted reverse proxies (enables X-Forwarded-For) |
 | `ALLOWED_ORIGINS` | `localhost:5173,localhost:3000` | CORS allowed origins (comma-separated) |
+| `ANTHROPIC_API_KEY` | — | Enables AI article summaries (Claude). Recommended auth path |
+| `CLAUDE_SUMMARY_MODEL` | `claude-haiku-4-5` | Model used for summaries |
+| `CLAUDE_AUTH_MODE` | *auto* | `apikey` or `oauth`. Auto-detects an API key, else a mounted OAuth credentials file |
+| `CLAUDE_CREDENTIALS_PATH` | `~/.claude/.credentials.json` | OAuth mode: path to the mounted Claude Code credentials file (access token is auto-refreshed) |
+
+> **AI summaries** are optional and disabled until configured. The recommended path is an `ANTHROPIC_API_KEY` from the Anthropic Console. OAuth mode (mounting a Claude.ai subscription token) is supported for personal/self-hosted use, but note that using a subscription OAuth token outside Claude Code / claude.ai may conflict with Anthropic's terms — prefer an API key.
 
 <br/>
 

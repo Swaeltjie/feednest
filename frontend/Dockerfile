@@ -12,6 +12,10 @@ WORKDIR /app
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json /app/package-lock.json ./
 RUN npm ci --omit=dev
+# Ensure all served assets are world-readable: the runtime runs as the non-root
+# `feednest` user, and adapter-node's static file serving crashes the process on
+# an EACCES read (e.g. a static file added with restrictive permissions).
+RUN chmod -R a+rX ./build
 
 USER feednest
 EXPOSE 3000

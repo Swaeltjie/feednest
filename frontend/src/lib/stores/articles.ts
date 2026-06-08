@@ -10,6 +10,7 @@ export interface Article {
 	content_clean: string;
 	content_raw: string;
 	snippet: string;
+	summary?: string;
 	thumbnail_url: string;
 	published_at: string | null;
 	word_count: number;
@@ -71,6 +72,7 @@ function createArticlesStore() {
 
 		async load(filters: ArticleFilters = {}) {
 			const thisLoad = ++loadId;
+			activeSearch.set(filters.search ?? '');
 			update((s) => ({ ...s, loading: true }));
 			const params = buildParams(filters);
 			if (filters.page) params.set('page', String(filters.page));
@@ -199,3 +201,7 @@ function createArticlesStore() {
 
 export const articles = createArticlesStore();
 export const hasMore = derived(articles, ($articles) => $articles.total > $articles.articles.length);
+
+// The active search term, mirrored from the most recent load(), used to
+// highlight matched terms in search results.
+export const activeSearch = writable('');

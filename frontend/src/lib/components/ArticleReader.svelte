@@ -16,6 +16,7 @@
 
 	initSanitizer();
 	import { blurUp } from '$lib/utils/blurload';
+	import { proxyImage } from '$lib/utils/image';
 
 	let {
 		articleId,
@@ -42,6 +43,39 @@
 	let starAnimating = $state(false);
 	let readerSettingsOpen = $state(false);
 
+	let heroImgFailed = $state(false);
+
+	// AI summary (TL;DR)
+	let summaryEnabled = $state(false);
+	let summary = $state('');
+	let summaryLoading = $state(false);
+	let summaryError = $state('');
+
+	// Check once whether AI summarization is configured (controls button visibility).
+	$effect(() => {
+		let cancelled = false;
+		api.get<{ enabled: boolean }>('/api/summary/config')
+			.then((c) => { if (!cancelled) summaryEnabled = !!c?.enabled; })
+			.catch(() => {});
+		return () => { cancelled = true; };
+	});
+
+	async function generateSummary() {
+		if (!article || summaryLoading) return;
+		if (article.summary) { summary = article.summary; return; }
+		summaryError = '';
+		summaryLoading = true;
+		try {
+			const res = await api.post<{ summary: string }>(`/api/articles/${article.id}/summary`);
+			summary = res.summary;
+			if (article) article.summary = res.summary;
+		} catch {
+			summaryError = 'Could not generate a summary right now.';
+		} finally {
+			summaryLoading = false;
+		}
+	}
+
 	// Task 8: Reading progress
 	let readingProgress = $state(0);
 	let readerScrollY = $state(0);
@@ -63,6 +97,10 @@
 		articles.getArticle(id).then((a) => {
 			if (cancelled) return;
 			article = a;
+			heroImgFailed = false;
+			summary = a?.summary ?? '';
+			summaryError = '';
+			summaryLoading = false;
 			if (a && !a.is_read) {
 				articles.toggleRead(a.id, true);
 				a.is_read = true;
@@ -253,6 +291,26 @@
 						<ReaderSettings bind:open={readerSettingsOpen} />
 					</div>
 
+					{#if summaryEnabled}
+						<button
+							onclick={generateSummary}
+							disabled={summaryLoading}
+							class="p-2 rounded-lg transition-all text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] hover:bg-[var(--color-elevated)] disabled:opacity-50 disabled:cursor-wait"
+							title="AI summary (TL;DR)"
+						>
+							{#if summaryLoading}
+								<svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+								</svg>
+							{:else}
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+								</svg>
+							{/if}
+						</button>
+					{/if}
+
 					<button
 						onclick={handleStar}
 						class="p-2 rounded-lg transition-all {starAnimating ? 'star-bounce' : ''}
@@ -304,9 +362,9 @@
 			bind:this={contentEl}
 			onscroll={handleReaderScroll}>
 			<!-- Hero image -->
-			{#if article.thumbnail_url}
+			{#if article.thumbnail_url && !heroImgFailed}
 				<div class="relative w-full h-56 overflow-hidden">
-					<img src={article.thumbnail_url} alt="" class="w-full h-full object-cover" use:blurUp />
+					<img src={proxyImage(article.thumbnail_url)} alt="" class="w-full h-full object-cover" onerror={() => (heroImgFailed = true)} use:blurUp />
 					<div class="absolute inset-0 hero-overlay"></div>
 				</div>
 			{/if}
@@ -352,6 +410,25 @@
 								{tag}
 							</span>
 						{/each}
+					</div>
+				{/if}
+
+				<!-- AI summary (TL;DR) -->
+				{#if summary || summaryLoading || summaryError}
+					<div class="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-accent-glow)] px-4 py-3" style="max-width: {READER_CONTENT_WIDTH_MAP[$settings.readerContentWidth]}; margin-left: auto; margin-right: auto;">
+						<div class="flex items-center gap-1.5 mb-1.5 text-xs font-semibold text-[var(--color-accent)]">
+							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+							</svg>
+							AI Summary
+						</div>
+						{#if summaryLoading}
+							<p class="text-sm text-[var(--color-text-secondary)]">Generating summary…</p>
+						{:else if summaryError}
+							<p class="text-sm text-red-500">{summaryError}</p>
+						{:else}
+							<p class="text-sm text-[var(--color-text-primary)] leading-relaxed">{summary}</p>
+						{/if}
 					</div>
 				{/if}
 

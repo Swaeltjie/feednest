@@ -29,6 +29,7 @@
 		onMarkAllRead,
 		onOpenExternal,
 		onOpenRules,
+		onOpenHealth,
 	}: {
 		open: boolean;
 		onSelectFeed?: (id: number) => void;
@@ -45,6 +46,7 @@
 		onMarkAllRead?: () => void;
 		onOpenExternal?: () => void;
 		onOpenRules?: () => void;
+		onOpenHealth?: () => void;
 	} = $props();
 
 	let query = $state('');
@@ -229,6 +231,14 @@
 			category: 'action',
 			icon: '🔧',
 			action: () => { onOpenRules?.(); close(); }
+		});
+
+		items.push({
+			id: 'action-health',
+			label: 'Feed Health',
+			category: 'action',
+			icon: '🩺',
+			action: () => { onOpenHealth?.(); close(); }
 		});
 
 		// ── Article search (only when query is typed) ──

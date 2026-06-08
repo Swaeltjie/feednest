@@ -7,6 +7,7 @@
 	import { tiltHover } from '$lib/utils/parallax';
 	import { blurUp } from '$lib/utils/blurload';
 	import { starBurst } from '$lib/utils/particles';
+	import { proxyImage } from '$lib/utils/image';
 
 	let {
 		article,
@@ -30,6 +31,10 @@
 			starBurst(e.clientX, e.clientY);
 		}
 	}
+
+	// Thumbnails are routed through the backend image proxy to defeat browser
+	// ORB/hotlink blocking. If even the proxy fails, fall back to the gradient.
+	let imgFailed = $state(false);
 
 	let starAnimating = $state(false);
 	function handleStarWithBounce(e: MouseEvent) {
@@ -59,12 +64,13 @@
 	class:ring-blue-500={selected}
 >
 	<!-- Background image or gradient fallback -->
-	{#if article.thumbnail_url}
+	{#if article.thumbnail_url && !imgFailed}
 		<img
-			src={article.thumbnail_url}
+			src={proxyImage(article.thumbnail_url)}
 			alt=""
 			class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
 			loading="lazy"
+			onerror={() => (imgFailed = true)}
 			use:blurUp
 		/>
 	{:else}

@@ -49,3 +49,10 @@ docs/plans/
 
 # Images / screenshots (not part of the app)
 icons.png
+test-*.png
+verify-*.jpeg
+feed-state.jpeg
+
+# Tooling caches / artifacts
+.codegraph/
+.playwright-mcp/

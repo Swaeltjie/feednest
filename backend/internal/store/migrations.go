@@ -144,6 +144,12 @@ func runAlterMigrations(db *sql.DB) {
 
 	alterMigrations := []string{
 		"ALTER TABLE feeds ADD COLUMN last_error TEXT",
+		// Feed health dashboard
+		"ALTER TABLE feeds ADD COLUMN last_success DATETIME",
+		"ALTER TABLE feeds ADD COLUMN consecutive_failures INTEGER DEFAULT 0",
+		"ALTER TABLE feeds ADD COLUMN last_fetch_status TEXT DEFAULT 'pending'",
+		// Cached AI summary (TL;DR) per article
+		"ALTER TABLE articles ADD COLUMN summary TEXT",
 	}
 	for _, stmt := range alterMigrations {
 		if _, err := db.Exec(stmt); err != nil {
@@ -152,4 +158,61 @@ func runAlterMigrations(db *sql.DB) {
 			}
 		}
 	}
+
+	setupFTS5(db)
+}
+
+// FTS5Enabled reports whether the SQLite build supports FTS5 and the
+// articles_fts index was created successfully. When false, full-text search
+// falls back to LIKE matching in ListArticles.
+var FTS5Enabled bool
+
+// setupFTS5 creates a standalone (self-contained) FTS5 index over article
+// title + content, kept in sync via triggers. A standalone table (rather than
+// an external-content one) stores its own copy of the text, which makes
+// snippet()/highlight() robust and the DELETE/UPDATE triggers simple — at the
+// cost of some extra disk. If the SQLite build lacks FTS5, every statement
+// errors and FTS5Enabled stays false so search degrades to LIKE.
+func setupFTS5(db *sql.DB) {
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts USING fts5(
+		title,
+		content,
+		tokenize = 'porter unicode61'
+	)`); err != nil {
+		log.Printf("FTS5 unavailable, falling back to LIKE search: %v", err)
+		return
+	}
+
+	triggers := []string{
+		`CREATE TRIGGER IF NOT EXISTS articles_fts_ai AFTER INSERT ON articles BEGIN
+			INSERT INTO articles_fts(rowid, title, content)
+			VALUES (new.id, COALESCE(new.title,''), COALESCE(new.content_clean, new.content_raw, ''));
+		END`,
+		`CREATE TRIGGER IF NOT EXISTS articles_fts_ad AFTER DELETE ON articles BEGIN
+			DELETE FROM articles_fts WHERE rowid = old.id;
+		END`,
+		`CREATE TRIGGER IF NOT EXISTS articles_fts_au AFTER UPDATE ON articles BEGIN
+			DELETE FROM articles_fts WHERE rowid = old.id;
+			INSERT INTO articles_fts(rowid, title, content)
+			VALUES (new.id, COALESCE(new.title,''), COALESCE(new.content_clean, new.content_raw, ''));
+		END`,
+	}
+	for _, stmt := range triggers {
+		if _, err := db.Exec(stmt); err != nil {
+			log.Printf("FTS5 trigger warning: %v", err)
+			return
+		}
+	}
+
+	// One-time backfill: index any existing articles not yet present.
+	// Cheap once populated (NOT IN against an indexed rowid set).
+	if _, err := db.Exec(`INSERT INTO articles_fts(rowid, title, content)
+		SELECT id, COALESCE(title,''), COALESCE(content_clean, content_raw, '')
+		FROM articles
+		WHERE id NOT IN (SELECT rowid FROM articles_fts)`); err != nil {
+		log.Printf("FTS5 backfill warning: %v", err)
+		return
+	}
+
+	FTS5Enabled = true
 }

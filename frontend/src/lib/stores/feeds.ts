@@ -10,6 +10,9 @@ export interface Feed {
 	category_id: number | null;
 	unread_count: number;
 	last_error: string | null;
+	last_success: string | null;
+	consecutive_failures: number;
+	last_fetch_status: string;
 }
 
 export interface Category {

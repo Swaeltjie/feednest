@@ -15,6 +15,9 @@ type Feed struct {
 	EngagementScore float64    `json:"engagement_score"`
 	CreatedAt       time.Time  `json:"created_at"`
 	LastError       *string    `json:"last_error"`
+	LastSuccess     *time.Time `json:"last_success"`
+	ConsecutiveFailures int    `json:"consecutive_failures"`
+	LastFetchStatus string     `json:"last_fetch_status"`
 	UnreadCount     int        `json:"unread_count,omitempty"`
 }
 

@@ -9,6 +9,7 @@
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import KeyboardHints from '$lib/components/KeyboardHints.svelte';
 	import FilterRules from '$lib/components/FilterRules.svelte';
+	import FeedHealth from '$lib/components/FeedHealth.svelte';
 	import { articles, type ArticleFilters } from '$lib/stores/articles';
 	import { feeds, categories } from '$lib/stores/feeds';
 	import { api, isSafeUrl } from '$lib/api/client';
@@ -53,6 +54,7 @@
 	let commandPaletteOpen = $state(false);
 	let keyboardHintsOpen = $state(false);
 	let filterRulesOpen = $state(false);
+	let feedHealthOpen = $state(false);
 	let scrollY = $state(0);
 	let headerCompact = $derived(scrollY > 80);
 	let focusMode = $state(false);
@@ -1023,6 +1025,7 @@
 		}
 	}}
 	onOpenRules={() => { filterRulesOpen = true; }}
+	onOpenHealth={() => { feedHealthOpen = true; }}
 />
 
 <!-- Keyboard Hints -->
@@ -1030,6 +1033,17 @@
 
 <!-- Filter Rules -->
 <FilterRules bind:open={filterRulesOpen} />
+
+<!-- Feed Health -->
+{#if feedHealthOpen}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 z-[100] flex items-start justify-center pt-16 px-4" onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); feedHealthOpen = false; } }}>
+		<div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick={() => (feedHealthOpen = false)} role="presentation"></div>
+		<div class="relative w-full max-w-2xl fade-in-up" style="animation-duration: var(--duration-snappy);">
+			<FeedHealth feeds={$feeds} onRetry={(id) => feeds.retry(id)} onClose={() => (feedHealthOpen = false)} />
+		</div>
+	</div>
+{/if}
 
 
 <!-- Add Feed Modal -->

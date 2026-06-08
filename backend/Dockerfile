@@ -6,7 +6,8 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o feednest ./cmd/feednest/
+# sqlite_fts5 enables the SQLite FTS5 extension used for full-text article search.
+RUN CGO_ENABLED=1 go build -tags "sqlite_fts5" -trimpath -ldflags="-s -w" -o feednest ./cmd/feednest/
 
 FROM alpine:3.23
 RUN apk add --no-cache ca-certificates su-exec && \

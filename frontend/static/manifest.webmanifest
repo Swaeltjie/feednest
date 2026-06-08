@@ -1,0 +1,25 @@
+{
+	"name": "FeedNest",
+	"short_name": "FeedNest",
+	"description": "A self-hosted RSS/Atom feed reader",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"theme_color": "#2563eb",
+	"background_color": "#0f172a",
+	"orientation": "portrait-primary",
+	"icons": [
+		{
+			"src": "/favicon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any"
+		},
+		{
+			"src": "/favicon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "maskable"
+		}
+	]
+}

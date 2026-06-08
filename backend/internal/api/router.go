@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/feednest/backend/internal/api/handlers"
+	"github.com/feednest/backend/internal/claude"
 	"github.com/feednest/backend/internal/scheduler"
 	"github.com/feednest/backend/internal/store"
 )
@@ -170,6 +171,15 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 	r.Get("/api/docs", swaggerUI)
 	r.Get("/api/docs/openapi.yaml", openapiYAML)
 
+	// Image proxy — intentionally public so <img> tags (which cannot send a JWT)
+	// can route thumbnails through it. SSRF-protected and image-only.
+	imageH := handlers.NewImageHandler()
+	r.Get("/api/image", imageH.Proxy)
+
+	// AI summarization (Claude). Built once at startup; reads auth from env.
+	claudeClient := claude.New()
+	summaryH := handlers.NewSummaryHandler(queries, claudeClient)
+
 	auth := NewAuthHandler(queries, jwtSecret)
 
 	// Rate limiter for auth endpoints: 10 attempts per minute per IP
@@ -213,6 +223,8 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		r.Get("/api/articles/{id}", articlesH.Get)
 		r.Put("/api/articles/{id}", articlesH.Update)
 		r.Post("/api/articles/{id}/dismiss", articlesH.Dismiss)
+		r.Post("/api/articles/{id}/summary", summaryH.Summarize)
+		r.Get("/api/summary/config", summaryH.Config)
 
 		tagsH := handlers.NewTagHandler(queries)
 		r.Get("/api/tags", tagsH.List)

@@ -1,11 +1,13 @@
 <script lang="ts">
 	import type { Article } from '$lib/stores/articles';
-	import { articles } from '$lib/stores/articles';
+	import { articles, activeSearch } from '$lib/stores/articles';
+	import { highlightParts } from '$lib/utils/highlight';
 	import { timeAgo } from '$lib/utils/time';
 	import { getFaviconUrl, handleFaviconError } from '$lib/utils/favicon';
 	import { getFeedColor } from '$lib/utils/color';
 	import { starBurst } from '$lib/utils/particles';
 	import { swipeable } from '$lib/utils/swipe';
+	import { proxyImage } from '$lib/utils/image';
 
 	let {
 		article,
@@ -26,6 +28,8 @@
 	} = $props();
 
 	let starAnimating = $state(false);
+	// Thumbnails route through the image proxy; gradient fallback on failure.
+	let imgFailed = $state(false);
 
 	function handleClick() {
 		onOpen(article.id);
@@ -72,13 +76,14 @@
 	style="view-transition-name: article-{article.id}; animation-delay: {index * 30}ms; border-left: 3px solid {feedAccentColor || 'transparent'}; opacity: {article.is_read ? 0.6 : ageOpacity};"
 >
 	<!-- Thumbnail -->
-	{#if article.thumbnail_url}
+	{#if article.thumbnail_url && !imgFailed}
 		<div class="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-[var(--color-border)]">
 			<img
-				src={article.thumbnail_url}
+				src={proxyImage(article.thumbnail_url)}
 				alt=""
 				class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
 				loading="lazy"
+				onerror={() => (imgFailed = true)}
 			/>
 		</div>
 	{:else}
@@ -92,12 +97,12 @@
 	<!-- Content -->
 	<div class="flex-1 min-w-0">
 		<h3 class="text-sm font-semibold text-[var(--color-text-primary)] leading-snug line-clamp-1 group-hover:text-[var(--color-accent)] transition-colors">
-			{article.title}
+			{#each highlightParts(article.title, $activeSearch) as part}{#if part.hit}<mark class="bg-[var(--color-accent-glow)] text-[var(--color-accent)] rounded-sm px-0.5">{part.text}</mark>{:else}{part.text}{/if}{/each}
 		</h3>
 
 		{#if article.snippet}
 			<p class="text-xs text-[var(--color-text-secondary)] line-clamp-2 mt-0.5 leading-relaxed">
-				{article.snippet}
+				{#each highlightParts(article.snippet, $activeSearch) as part}{#if part.hit}<mark class="bg-[var(--color-accent-glow)] text-[var(--color-accent)] rounded-sm px-0.5">{part.text}</mark>{:else}{part.text}{/if}{/each}
 			</p>
 		{/if}
 

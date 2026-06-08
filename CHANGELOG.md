@@ -5,6 +5,23 @@ All notable changes to FeedNest will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-06-08
+
+### Added
+- **AI article summaries (Claude)** — generate a 2–3 sentence TL;DR for any article from the reader. Uses the `claude-haiku-4-5` model via the official Anthropic Go SDK. Summaries are cached per-article (`articles.summary`). Authentication is pluggable: set `ANTHROPIC_API_KEY` (recommended), or opt into mounting a Claude Code OAuth credentials file with automatic token refresh (`CLAUDE_AUTH_MODE=oauth`). The Summarize button only appears when summarization is configured (`GET /api/summary/config`).
+- **Full-text search (SQLite FTS5)** — article search now uses an FTS5 index over title + content (porter stemming, phrase/token matching) instead of `LIKE` substring matching, with safe client-side highlighting of matched terms in results. Falls back to `LIKE` automatically if the SQLite build lacks FTS5.
+- **Feed health dashboard** — a per-feed health view (open via the command palette → "Feed Health") showing healthy/warning/dead counts, last-success time, last error, consecutive-failure counts, and a per-feed retry button. New feed columns: `last_success`, `consecutive_failures`, `last_fetch_status`.
+- **Progressive Web App** — FeedNest is now installable: a web app manifest, a service worker that precaches the app shell and caches read endpoints (`/api/articles`, article detail, proxied images) for offline reading, and an online/offline store. Auth endpoints are never cached.
+- **Backend image proxy** (`GET /api/image?url=...`) — routes article thumbnails server-side with a browser User-Agent and no Referer, defeating the browser-side blocks (Opaque Response Blocking, referer/hotlink protection, mixed content) that left many feed images broken. SSRF-protected and image-only.
+
+### Fixed
+- **Broken article thumbnails** — thumbnails now route through the image proxy and fall back to the gradient placeholder via an `onerror` handler when an image genuinely cannot be loaded (previously a failed image rendered as a broken/empty box; many otherwise-valid images were silently blocked by the browser).
+- **Filter rules could not be saved** — the rule editor sent `mark_read`/`star` action values that the backend rejected; aligned them to `auto_read`/`auto_star` so auto-mark-read and auto-star rules now save and apply.
+- **Frontend container crash on restrictive static-file permissions** — adapter-node crashed with `EACCES` when serving a static file the runtime user could not read; the Docker image now normalizes asset permissions.
+
+### Changed
+- Backend Docker image is now built with the `sqlite_fts5` build tag to enable full-text search.
+
 ## [1.0.2] - 2026-06-07
 
 ### Fixed

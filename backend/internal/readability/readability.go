@@ -86,6 +86,7 @@ func Extract(articleURL string) (*ExtractionResult, error) {
 	}
 
 	var lastErr error
+	var thumbOnly *ExtractionResult
 	for _, strategy := range strategies {
 		result, err := tryExtract(articleURL, parsedURL, strategy)
 		if err != nil {
@@ -95,8 +96,18 @@ func Extract(articleURL string) (*ExtractionResult, error) {
 		if result != nil && result.Content != "" {
 			return result, nil
 		}
+		// Content extraction failed for this strategy, but the page may still
+		// have yielded a thumbnail (e.g. og:image on a JS-rendered page that
+		// readability can't parse). Keep it as a fallback so a missing article
+		// body doesn't also cost us the thumbnail.
+		if result != nil && result.ThumbnailURL != "" && thumbOnly == nil {
+			thumbOnly = result
+		}
 	}
 
+	if thumbOnly != nil {
+		return thumbOnly, nil
+	}
 	if lastErr != nil {
 		return nil, lastErr
 	}
@@ -131,26 +142,32 @@ func tryExtract(articleURL string, parsedURL *url.URL, strategy extractionStrate
 
 	rawHTML := string(rawBody)
 
-	article, err := goreadability.FromReader(bytes.NewReader(rawBody), parsedURL)
-	if err != nil {
-		return nil, fmt.Errorf("strategy %s: readability error: %w", strategy.name, err)
-	}
+	// The page-level thumbnail (og:image / twitter:image) is parsed straight from
+	// the raw HTML and does NOT depend on readability successfully extracting the
+	// article body — so a JS-rendered page that readability can't parse still
+	// yields a thumbnail.
+	pageThumbnail := ExtractThumbnailFromHTML(rawHTML)
 
-	var contentBuf bytes.Buffer
-	if article.Node != nil {
-		if err := article.RenderHTML(&contentBuf); err != nil {
-			return nil, fmt.Errorf("strategy %s: readability render error: %w", strategy.name, err)
+	var content string
+	var readabilityThumb string
+	if article, err := goreadability.FromReader(bytes.NewReader(rawBody), parsedURL); err == nil {
+		var contentBuf bytes.Buffer
+		if article.Node != nil {
+			if rerr := article.RenderHTML(&contentBuf); rerr == nil {
+				content = contentBuf.String()
+			}
 		}
+		readabilityThumb = article.ImageURL()
 	}
-	content := contentBuf.String()
+	// Drop bot-protection bodies, but keep any thumbnail we found.
 	if IsBlockedContent(content) {
-		return nil, fmt.Errorf("strategy %s: content is bot-protection page for %s", strategy.name, articleURL)
+		content = ""
 	}
 
-	// Extract thumbnail: go-readability ImageURL > og:image from raw HTML > first <img> in content
-	thumbnail := article.ImageURL()
+	// Thumbnail preference: readability's main image > og:image/twitter:image > first <img> in content.
+	thumbnail := readabilityThumb
 	if thumbnail == "" {
-		thumbnail = ExtractThumbnailFromHTML(rawHTML)
+		thumbnail = pageThumbnail
 	}
 	if thumbnail == "" {
 		thumbnail = extractFirstImg(content)
@@ -190,16 +207,19 @@ func IsBlockedContent(content string) bool {
 
 var ogImageRe = regexp.MustCompile(`<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']`)
 var ogImageRe2 = regexp.MustCompile(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']`)
+var twitterImageRe = regexp.MustCompile(`<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']`)
+var twitterImageRe2 = regexp.MustCompile(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']`)
 var imgSrcRe = regexp.MustCompile(`(?i)<img[^>]+src=["']([^"']+)["']`)
 
+// ExtractThumbnailFromHTML pulls a representative image URL from a page's social
+// meta tags: og:image (either attribute order), then twitter:image as a fallback.
 func ExtractThumbnailFromHTML(html string) string {
-	matches := ogImageRe.FindStringSubmatch(html)
-	if len(matches) > 1 {
-		return strings.TrimSpace(matches[1])
-	}
-	matches = ogImageRe2.FindStringSubmatch(html)
-	if len(matches) > 1 {
-		return strings.TrimSpace(matches[1])
+	for _, re := range []*regexp.Regexp{ogImageRe, ogImageRe2, twitterImageRe, twitterImageRe2} {
+		if m := re.FindStringSubmatch(html); len(m) > 1 {
+			if v := strings.TrimSpace(m[1]); v != "" {
+				return v
+			}
+		}
 	}
 	return ""
 }

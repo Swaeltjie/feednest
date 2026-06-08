@@ -12,11 +12,12 @@ import (
 )
 
 type Scheduler struct {
-	store    *store.Queries
-	interval time.Duration
-	stop     chan struct{}
-	stopOnce sync.Once
-	fetchSem chan struct{} // limits concurrent immediate fetches
+	store       *store.Queries
+	interval    time.Duration
+	stop        chan struct{}
+	stopOnce    sync.Once
+	fetchSem    chan struct{} // limits concurrent immediate fetches
+	backfilling atomic.Bool   // ensures only one thumbnail backfill runs at a time
 }
 
 func New(store *store.Queries, interval time.Duration) *Scheduler {
@@ -40,6 +41,9 @@ func (s *Scheduler) Start() {
 			select {
 			case <-ticker.C:
 				s.fetchAll()
+				// Self-heal any articles still missing a thumbnail (e.g. a
+				// transient extraction failure at ingest time).
+				go s.backfillThumbnails()
 			case <-s.stop:
 				return
 			}
@@ -48,8 +52,15 @@ func (s *Scheduler) Start() {
 	log.Printf("Feed scheduler started (interval: %v)", s.interval)
 }
 
-// backfillThumbnails fetches thumbnails for existing articles that are missing them.
+// backfillThumbnails fetches thumbnails for existing articles that are missing
+// them. It is guarded so overlapping invocations (startup + periodic) don't
+// duplicate work.
 func (s *Scheduler) backfillThumbnails() {
+	if !s.backfilling.CompareAndSwap(false, true) {
+		return
+	}
+	defer s.backfilling.Store(false)
+
 	articles, err := s.store.GetArticlesMissingThumbnails(500)
 	if err != nil {
 		log.Printf("scheduler: failed to get articles missing thumbnails: %v", err)
@@ -237,9 +248,17 @@ func (s *Scheduler) fetchAll() {
 
 				var contentClean string
 				if item.URL != "" {
-					if clean, err := readability.ExtractContent(item.URL); err == nil {
-						contentClean = clean
+					// Fetch the article page once for BOTH content and a
+					// thumbnail (og:image/twitter:image). Feeds like BBC and
+					// Hacker News often ship no image in the RSS item, so the
+					// page-level thumbnail is the only source.
+					if extracted, err := readability.Extract(item.URL); err == nil {
+						contentClean = extracted.Content
+						if thumbnailURL == "" {
+							thumbnailURL = extracted.ThumbnailURL
+						}
 					}
+					// Last resort: an <img> embedded in the RSS content itself.
 					if thumbnailURL == "" {
 						thumbnailURL = readability.ExtractThumbnailFromHTML(item.ContentRaw)
 					}

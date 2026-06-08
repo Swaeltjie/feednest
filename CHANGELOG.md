@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Broken article thumbnails** — thumbnails now route through the image proxy and fall back to the gradient placeholder via an `onerror` handler when an image genuinely cannot be loaded (previously a failed image rendered as a broken/empty box; many otherwise-valid images were silently blocked by the browser).
+- **Missing article thumbnails (extraction)** — many articles (e.g. BBC, Hacker News) had no thumbnail at all because (1) `readability.Extract` discarded a valid `og:image` whenever the article body couldn't be parsed, (2) the scheduled fetch path never looked at the article page for an image (only the RSS `<description>`), and (3) thumbnail backfill ran only once at startup. Extraction now pulls `og:image`/`twitter:image` independent of body parsing, the scheduler fetches page-level images at ingest, and backfill runs periodically. (BBC coverage went from missing-5 to complete; the only remaining gaps are pages that genuinely have no image.)
 - **Filter rules could not be saved** — the rule editor sent `mark_read`/`star` action values that the backend rejected; aligned them to `auto_read`/`auto_star` so auto-mark-read and auto-star rules now save and apply.
 - **Frontend container crash on restrictive static-file permissions** — adapter-node crashed with `EACCES` when serving a static file the runtime user could not read; the Docker image now normalizes asset permissions.
 

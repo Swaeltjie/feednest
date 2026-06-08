@@ -33,29 +33,70 @@ func buildFTSMatch(search string) string {
 	return strings.Join(tokens, " ")
 }
 
+// ftsStopwords are common English function words plus feed-query "meta" words
+// (feeds, articles, stories, recently, …). They are dropped from OR-recall
+// passage retrieval so that rare, topical terms dominate bm25 ranking instead
+// of being diluted by ubiquitous words: a natural-language question like
+// "what stories have my feeds covered recently about X" otherwise OR-matches
+// nearly every article through its filler words, burying the relevant ones.
+var ftsStopwords = map[string]bool{
+	"a": true, "an": true, "the": true, "and": true, "or": true, "but": true,
+	"of": true, "to": true, "in": true, "on": true, "at": true, "by": true,
+	"for": true, "with": true, "about": true, "from": true, "into": true,
+	"over": true, "as": true, "than": true, "then": true, "so": true, "if": true,
+	"i": true, "me": true, "my": true, "mine": true, "we": true, "our": true,
+	"us": true, "you": true, "your": true, "it": true, "its": true, "they": true,
+	"them": true, "their": true, "this": true, "that": true, "these": true,
+	"those": true, "any": true, "some": true, "all": true, "more": true, "most": true,
+	"what": true, "which": true, "who": true, "whom": true, "whose": true,
+	"when": true, "where": true, "why": true, "how": true,
+	"is": true, "are": true, "was": true, "were": true, "be": true, "been": true,
+	"being": true, "am": true, "do": true, "does": true, "did": true, "doing": true,
+	"have": true, "has": true, "had": true, "having": true, "will": true,
+	"would": true, "can": true, "could": true, "should": true, "may": true,
+	"might": true, "must": true, "not": true, "no": true, "there": true,
+	"here": true, "just": true, "only": true, "also": true, "up": true, "out": true,
+	// feed-query meta words (rarely the actual topic of a question)
+	"feed": true, "feeds": true, "article": true, "articles": true,
+	"story": true, "stories": true, "post": true, "posts": true,
+	"recently": true, "recent": true, "lately": true,
+}
+
+// ftsSentencePunct is trimmed from the ends of each token before the stopword
+// check and quoting, so "recently?" matches the stopword "recently" and
+// "Anthropic." searches for "Anthropic". Double quotes are intentionally NOT
+// trimmed — they are handled by the FTS escaping below.
+const ftsSentencePunct = ".,!?;:"
+
 // buildFTSMatchOR is like buildFTSMatch but OR-joins the tokens instead of
 // AND-ing them, trading precision for recall. It is used by passage retrieval
-// ("Ask Your Feeds") where surfacing any article mentioning any query term is
-// preferable to requiring all terms to co-occur. Tokenization and escaping are
-// identical to buildFTSMatch; returns "" when there is nothing searchable.
+// ("Ask Your Feeds") where surfacing any article mentioning a query term is
+// preferable to requiring all terms to co-occur. To stop recall from drowning
+// topical terms in noise, stopwords (see ftsStopwords) are dropped first; if a
+// query is ENTIRELY stopwords (e.g. "what is that") all tokens are kept so
+// retrieval still runs. Returns "" when there is nothing searchable.
 func buildFTSMatchOR(search string) string {
-	fields := strings.Fields(search)
-	if len(fields) == 0 {
-		return ""
-	}
-	var tokens []string
-	for _, f := range fields {
-		f = strings.TrimSpace(f)
+	var kept, all []string
+	for _, f := range strings.Fields(search) {
+		f = strings.Trim(f, ftsSentencePunct)
 		if f == "" {
 			continue
 		}
 		// Escape embedded double quotes by doubling them, then wrap as a
 		// quoted FTS5 string token so operators inside are treated literally.
-		escaped := strings.ReplaceAll(f, `"`, `""`)
-		tokens = append(tokens, `"`+escaped+`"`)
+		token := `"` + strings.ReplaceAll(f, `"`, `""`) + `"`
+		all = append(all, token)
+		if !ftsStopwords[strings.ToLower(f)] {
+			kept = append(kept, token)
+		}
 	}
-	if len(tokens) == 0 {
+	// Fall back to every token when the query is nothing but stopwords, so a
+	// question like "what is that about" still retrieves something.
+	if len(kept) == 0 {
+		kept = all
+	}
+	if len(kept) == 0 {
 		return ""
 	}
-	return strings.Join(tokens, " OR ")
+	return strings.Join(kept, " OR ")
 }

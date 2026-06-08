@@ -17,6 +17,9 @@ func TestBuildFTSMatchOR(t *testing.T) {
 		{"OR joins multiple tokens", "rust async runtime", `"rust" OR "async" OR "runtime"`},
 		{"escapes embedded quotes", `say "hi"`, `"say" OR """hi"""`},
 		{"collapses extra whitespace", "  foo    bar  ", `"foo" OR "bar"`},
+		{"drops stopwords, keeps topical terms", "What security stories have my feeds covered recently?", `"security" OR "covered"`},
+		{"all-stopword query keeps every token", "what is the", `"what" OR "is" OR "the"`},
+		{"strips trailing sentence punctuation", "Anthropic.", `"Anthropic"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -71,6 +74,28 @@ func TestSearchPassages(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("expected 'Learning Rust' in passages, got %+v", passages)
+		}
+	})
+
+	t.Run("stopword-laden question still matches the topical term", func(t *testing.T) {
+		// A natural-language question buried in stopwords must still retrieve the
+		// Rust article via its one topical term, and must NOT pull in the
+		// unrelated cooking article through filler words.
+		passages, err := q.SearchPassages(userID, "what have my feeds said about Rust lately?", 8)
+		if err != nil {
+			t.Fatalf("SearchPassages failed: %v", err)
+		}
+		found := false
+		for _, p := range passages {
+			if p.Title == "Learning Rust" {
+				found = true
+			}
+			if p.Title == "Cooking Pasta" {
+				t.Errorf("stopword-laden Rust query leaked unrelated article: %+v", p)
+			}
+		}
+		if !found {
+			t.Errorf("expected 'Learning Rust' for stopword-laden Rust query, got %+v", passages)
 		}
 	})
 

@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/swaeltjie/feednest-backend:1.1.0
+    image: ghcr.io/swaeltjie/feednest-backend:1.0.4
     ports:
       - "127.0.0.1:8082:8080"
     volumes:
@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/swaeltjie/feednest-frontend:1.1.0
+    image: ghcr.io/swaeltjie/feednest-frontend:1.0.4
     ports:
       - "127.0.0.1:3000:3000"
     environment:

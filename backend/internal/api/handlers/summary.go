@@ -76,11 +76,16 @@ func (h *SummaryHandler) Summarize(w http.ResponseWriter, r *http.Request) {
 
 	summary, err := h.claude.Summarize(ctx, article.Title, content)
 	if err != nil {
-		if errors.Is(err, claude.ErrDisabled) {
+		switch {
+		case errors.Is(err, claude.ErrDisabled):
 			http.Error(w, `{"error":"AI summaries are not configured"}`, http.StatusServiceUnavailable)
-			return
+		case errors.Is(err, context.DeadlineExceeded):
+			http.Error(w, `{"error":"summary generation timed out"}`, http.StatusGatewayTimeout)
+		case r.Context().Err() != nil:
+			// Client disconnected — don't bother writing a body.
+		default:
+			http.Error(w, `{"error":"failed to generate summary"}`, http.StatusBadGateway)
 		}
-		http.Error(w, `{"error":"failed to generate summary"}`, http.StatusBadGateway)
 		return
 	}
 

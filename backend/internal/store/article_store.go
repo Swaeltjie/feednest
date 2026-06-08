@@ -331,12 +331,6 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 
 	where := strings.Join(conditions, " AND ")
 
-	var total int
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM articles a JOIN feeds f ON a.feed_id = f.id WHERE %s", where)
-	if err := q.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-
 	var orderBy string
 	switch filter.Sort {
 	case "oldest":
@@ -350,6 +344,96 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 	if filter.Page < 1 {
 		filter.Page = 1
 	}
+
+	// Regex hide rules cannot be expressed in SQL, so they are post-filtered in
+	// Go. When any are active we must filter BEFORE pagination, otherwise the
+	// SQL COUNT(*) over-reports the total and rows hidden on a truncated page
+	// are silently dropped without being backfilled from the next page. In that
+	// case we fetch all candidate rows (up to a safety cap), apply the regex
+	// filter, recompute the total, then slice the requested page in Go.
+	if len(regexHideRules) > 0 {
+		// Safety cap to bound memory: hide rules are expected to remove only a
+		// small fraction of articles, so over-fetching everything is acceptable.
+		const regexCandidateCap = 50000
+		query := fmt.Sprintf(`
+			SELECT a.id, a.feed_id, a.guid, a.title, a.url, a.author, a.content_raw, a.content_clean,
+				a.thumbnail_url, a.published_at, a.fetched_at, a.word_count, a.reading_time,
+				a.is_read, a.is_starred, a.read_at, a.score,
+				COALESCE(f.title, '') as feed_title, COALESCE(f.icon_url, '') as feed_icon_url
+			FROM articles a
+			JOIN feeds f ON a.feed_id = f.id
+			WHERE %s
+			ORDER BY %s
+			LIMIT ?`, where, orderBy)
+
+		queryArgs := append(args, regexCandidateCap)
+		rows, err := q.db.Query(query, queryArgs...)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+
+		// Collect candidates and apply the regex hide filter before truncating
+		// content, so regex matches against the complete article text.
+		var filtered []models.Article
+		for rows.Next() {
+			var a models.Article
+			if err := rows.Scan(&a.ID, &a.FeedID, &a.GUID, &a.Title, &a.URL, &a.Author, &a.ContentRaw, &a.ContentClean,
+				&a.ThumbnailURL, &a.PublishedAt, &a.FetchedAt, &a.WordCount, &a.ReadingTime,
+				&a.IsRead, &a.IsStarred, &a.ReadAt, &a.Score, &a.FeedTitle, &a.FeedIconURL); err != nil {
+				return nil, 0, err
+			}
+			if articleHiddenByRegex(&a, regexHideRules) {
+				continue
+			}
+			snippet := makeSnippet(a.ContentClean, 160)
+			if snippet == "" {
+				snippet = makeSnippet(a.ContentRaw, 160)
+			}
+			a.Snippet = snippet
+			filtered = append(filtered, a)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, 0, err
+		}
+
+		// Recompute total from the filtered set so pagination and counts stay
+		// consistent with what the user can actually reach.
+		total := len(filtered)
+
+		// Slice the requested page with bounds-checked offset/limit.
+		start := (filter.Page - 1) * filter.Limit
+		if start < 0 || start > len(filtered) {
+			start = len(filtered)
+		}
+		end := start + filter.Limit
+		if filter.Limit <= 0 || end > len(filtered) {
+			end = len(filtered)
+		}
+		articles := filtered[start:end]
+
+		// Override reading_time with personalized WPM and clear full content
+		// (only snippets are needed) on the final sliced page.
+		userWPM := q.GetUserWPM(userID)
+		for i := range articles {
+			if articles[i].WordCount > 0 {
+				articles[i].ReadingTime = int(math.Ceil(float64(articles[i].WordCount) / userWPM))
+			}
+			articles[i].ContentClean = ""
+			articles[i].ContentRaw = ""
+		}
+
+		return articles, total, nil
+	}
+
+	// Common fast path: no regex hide rules, so SQL COUNT + LIMIT/OFFSET are
+	// accurate and we let SQLite do the pagination.
+	var total int
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM articles a JOIN feeds f ON a.feed_id = f.id WHERE %s", where)
+	if err := q.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
 	offset := (filter.Page - 1) * filter.Limit
 	query := fmt.Sprintf(`
 		SELECT a.id, a.feed_id, a.guid, a.title, a.url, a.author, a.content_raw, a.content_clean,
@@ -396,41 +480,6 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		}
 	}
 
-	// Post-filter regex hide rules (runs before clearing full content so regex
-	// matches against the complete article text, not the truncated snippet)
-	if len(regexHideRules) > 0 {
-		filtered := articles[:0]
-		for _, a := range articles {
-			hidden := false
-			for _, rule := range regexHideRules {
-				if rule.FeedID != nil && a.FeedID != *rule.FeedID {
-					continue
-				}
-				var fieldValue string
-				switch rule.Field {
-				case "title":
-					fieldValue = a.Title
-				case "author":
-					fieldValue = a.Author
-				case "content":
-					if a.ContentClean != "" {
-						fieldValue = a.ContentClean
-					} else {
-						fieldValue = a.ContentRaw
-					}
-				}
-				if re, err := compileRegexCached(rule.Value); err == nil && re.MatchString(fieldValue) {
-					hidden = true
-					break
-				}
-			}
-			if !hidden {
-				filtered = append(filtered, a)
-			}
-		}
-		articles = filtered
-	}
-
 	// Clear full content from list responses (only snippets needed)
 	for i := range articles {
 		articles[i].ContentClean = ""
@@ -438,6 +487,34 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 	}
 
 	return articles, total, nil
+}
+
+// articleHiddenByRegex reports whether the article matches any of the given
+// regex hide rules. Feed-scoped rules only apply to their own feed. Invalid
+// patterns are ignored (they never hide an article).
+func articleHiddenByRegex(a *models.Article, regexHideRules []models.FilterRule) bool {
+	for _, rule := range regexHideRules {
+		if rule.FeedID != nil && a.FeedID != *rule.FeedID {
+			continue
+		}
+		var fieldValue string
+		switch rule.Field {
+		case "title":
+			fieldValue = a.Title
+		case "author":
+			fieldValue = a.Author
+		case "content":
+			if a.ContentClean != "" {
+				fieldValue = a.ContentClean
+			} else {
+				fieldValue = a.ContentRaw
+			}
+		}
+		if re, err := compileRegexCached(rule.Value); err == nil && re.MatchString(fieldValue) {
+			return true
+		}
+	}
+	return false
 }
 
 func (q *Queries) UpdateArticleContent(id int64, contentClean string, wordCount, readingTime int) error {

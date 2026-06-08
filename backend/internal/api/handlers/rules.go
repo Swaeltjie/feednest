@@ -87,6 +87,13 @@ func (h *RulesHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if req.FeedID != nil {
+		if _, err := h.store.GetFeed(*req.FeedID, userID); err != nil {
+			http.Error(w, `{"error":"feed not found"}`, http.StatusBadRequest)
+			return
+		}
+	}
+
 	rule, err := h.store.CreateRule(userID, req.Name, req.Field, req.Operator, req.Value, req.Action, req.FeedID)
 	if err != nil {
 		http.Error(w, `{"error":"failed to create rule"}`, http.StatusInternalServerError)
@@ -154,6 +161,13 @@ func (h *RulesHandler) Update(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, `{"error":"invalid regex pattern"}`, http.StatusBadRequest)
 				return
 			}
+		}
+	}
+
+	if req.FeedID != nil {
+		if _, err := h.store.GetFeed(*req.FeedID, userID); err != nil {
+			http.Error(w, `{"error":"feed not found"}`, http.StatusBadRequest)
+			return
 		}
 	}
 

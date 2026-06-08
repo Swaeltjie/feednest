@@ -2,6 +2,7 @@ package claude
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -136,7 +137,7 @@ func parseExpiresAt(raw json.RawMessage) time.Time {
 }
 
 // Token returns a valid access token, refreshing when within 60s of expiry.
-func (p *oauthProvider) Token() (string, error) {
+func (p *oauthProvider) Token(ctx context.Context) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -148,7 +149,7 @@ func (p *oauthProvider) Token() (string, error) {
 		// No refresh token: use whatever we have until it stops working.
 		return p.access, nil
 	}
-	if err := p.doRefresh(); err != nil {
+	if err := p.doRefresh(ctx); err != nil {
 		// If the (possibly stale) access token is still non-empty, return it so
 		// the request can surface a precise upstream auth error.
 		if p.access != "" {
@@ -159,13 +160,17 @@ func (p *oauthProvider) Token() (string, error) {
 	return p.access, nil
 }
 
-func (p *oauthProvider) doRefresh() error {
+func (p *oauthProvider) doRefresh(ctx context.Context) error {
 	body, _ := json.Marshal(map[string]string{
 		"grant_type":    "refresh_token",
 		"refresh_token": p.refresh,
 		"client_id":     p.clientID,
 	})
-	req, err := http.NewRequest(http.MethodPost, p.tokenURL, bytes.NewReader(body))
+	// Bound the refresh by 30s while still honoring the caller's deadline /
+	// cancellation, whichever fires sooner.
+	reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, p.tokenURL, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}

@@ -102,11 +102,18 @@ func (h *AskHandler) Ask(w http.ResponseWriter, r *http.Request) {
 
 	answer, err := h.claude.Answer(ctx, question, cps)
 	if err != nil {
-		if errors.Is(err, claude.ErrDisabled) {
+		switch {
+		case errors.Is(err, claude.ErrDisabled):
 			http.Error(w, `{"error":"AI features are not configured"}`, http.StatusServiceUnavailable)
+		case errors.Is(err, context.DeadlineExceeded):
+			// Our own 60s budget expired waiting on Claude.
+			http.Error(w, `{"error":"answer generation timed out"}`, http.StatusGatewayTimeout)
+		case errors.Is(err, context.Canceled) || r.Context().Err() != nil:
+			// Client disconnected; the connection is gone, so don't write a body.
 			return
+		default:
+			http.Error(w, `{"error":"failed to generate answer"}`, http.StatusBadGateway)
 		}
-		http.Error(w, `{"error":"failed to generate answer"}`, http.StatusBadGateway)
 		return
 	}
 

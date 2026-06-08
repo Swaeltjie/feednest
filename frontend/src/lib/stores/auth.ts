@@ -45,6 +45,11 @@ function createAuthStore() {
 		},
 
 		logout() {
+			// Purge user-specific responses (articles, proxied images) from the
+			// service worker cache so they can't be read after sign-out.
+			if (browser && 'serviceWorker' in navigator) {
+				navigator.serviceWorker.controller?.postMessage({ type: 'PURGE_PRIVATE_CACHE' });
+			}
 			setAccessToken(null);
 			if (browser) localStorage.removeItem('feednest_refresh_token');
 			set({ user: null, isAuthenticated: false, loading: false });

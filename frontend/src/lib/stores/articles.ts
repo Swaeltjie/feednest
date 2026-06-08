@@ -52,7 +52,7 @@ function createArticlesStore() {
 
 	let loadId = 0;
 	let loadMoreId = 0;
-	const PAGE_SIZE = 30;
+	let loadedPages = 0;
 
 	function buildParams(filters: ArticleFilters): URLSearchParams {
 		const params = new URLSearchParams();
@@ -81,6 +81,7 @@ function createArticlesStore() {
 				const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);
 				if (thisLoad !== loadId) return;
 				set({ articles: data.articles || [], total: data.total, loading: false, loadingMore: false });
+				loadedPages = 1;
 			} catch {
 				if (thisLoad !== loadId) return;
 				update((s) => ({ ...s, loading: false }));
@@ -104,13 +105,14 @@ function createArticlesStore() {
 			const loadGen = loadId;
 			update((s) => ({ ...s, loadingMore: true }));
 
-			const nextPage = Math.floor(currentLength / PAGE_SIZE) + 1;
+			const nextPage = loadedPages + 1;
 			const params = buildParams(filters);
 			params.set('page', String(nextPage));
 
 			try {
 				const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);
 				if (thisLoadMore !== loadMoreId || loadGen !== loadId) return;
+				loadedPages = nextPage;
 				update((s) => {
 					const existing = new Set(s.articles.map((a) => a.id));
 					const newArticles = (data.articles || []).filter((a) => !existing.has(a.id));

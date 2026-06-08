@@ -129,6 +129,39 @@ function isImageProxyRequest(pathname: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Message — purge authenticated runtime cache entries on logout.
+// ---------------------------------------------------------------------------
+// `/api/articles*` responses are user-specific and live behind AuthMiddleware,
+// yet they get persisted in the versioned cache by `networkFirst`. Cache entries
+// are keyed by URL only (never by user or token), so on a shared device the next
+// user could read the previous user's cached articles. On logout the app posts a
+// `PURGE_PRIVATE_CACHE` message so we drop those entries (and the image-proxy
+// thumbnails, which are likewise user-context-derived) from the current cache.
+sw.addEventListener('message', (event) => {
+	if (event.data?.type === 'PURGE_PRIVATE_CACHE') {
+		event.waitUntil(
+			(async () => {
+				try {
+					const cache = await caches.open(CACHE);
+					const keys = await cache.keys();
+					await Promise.all(
+						keys.map((req) => {
+							const p = new URL(req.url).pathname;
+							if (isCacheableArticleRequest(p) || isImageProxyRequest(p)) {
+								return cache.delete(req);
+							}
+							return Promise.resolve(false);
+						})
+					);
+				} catch (err) {
+					console.error('[sw] private cache purge failed', err);
+				}
+			})()
+		);
+	}
+});
+
+// ---------------------------------------------------------------------------
 // Fetch — routing.
 // ---------------------------------------------------------------------------
 sw.addEventListener('fetch', (event) => {

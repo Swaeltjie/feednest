@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Best Of — smart ranking activated** — the article scorer is now live. A background pass (on the existing feed-refresh schedule) computes a per-feed engagement score from your own `reading_events` (read-through rate, read depth vs. article length, click signal, dismiss penalty over a 90-day window) and writes a recency-plus-engagement `score` to recent articles. A new **Best Of** sidebar view surfaces the top-ranked articles from the last 7 days (`GET /api/articles?sort=smart&published_after=...`), and the existing **Smart** sort now reflects real signal everywhere instead of always ordering by date. All ranking is computed and stored locally — no behavior leaves your instance. (Previously `scorer.CalculateScore`, `articles.score`, and `feeds.engagement_score` were dead code.)
 - **Ask Your Feeds — AI answers grounded in your archive** — a new **Ask** button (and command-palette action) opens a prompt that answers natural-language questions about your subscriptions. Relevant article passages are retrieved from the existing FTS5 index (no embeddings, no vector DB) and sent to Claude, which answers using only those passages and returns inline `[n]` citations linking to the source articles. New endpoint `POST /api/ask`; shares the AI gate with summaries (`GET /api/summary/config`), so it appears only when `ANTHROPIC_API_KEY` (or OAuth) is configured.
 
+### Security
+- **SSRF blocklist expanded** — the URL guard (image proxy, feed fetch, discovery) now also blocks CGNAT/shared-address space (`100.64.0.0/10`), NAT64 (`64:ff9b::/96`, including the `169.254.169.254` metadata-bypass vector), and other reserved ranges (`198.18.0.0/15`, `240.0.0.0/4`, documentation ranges).
+- **Image proxy hardened** — outbound destination ports restricted to 80/443 on the initial URL *and* every redirect hop, a global outbound-concurrency cap, response size lowered to 5 MB, and per-IP rate limiting (120/min) so the public proxy can't be abused as an open relay.
+- **AI endpoints rate-limited** — `POST /api/ask` and `POST /api/articles/{id}/summary` are now per-user rate limited (10/min) to bound LLM cost and abuse.
+- **Auth rate-limiter fixes** — keys on the client IP with the ephemeral source port stripped (repeated fresh connections now share a bucket), and behind a trusted proxy honors only the right-most `X-Forwarded-For` hop (anti-spoof).
+- **Filter-rule feed ownership** — `feed_id` on filter rules is validated against the caller's own feeds, closing an IDOR/cross-tenant gap (invalid ids now return 400 instead of 500).
+- **JWT secret strength** — an operator-supplied `JWT_SECRET` shorter than 32 characters now aborts startup instead of running with a weak key.
+- **CORS** — disabled unnecessary credentialed CORS (authentication is Bearer-token only).
+- **Feed discovery bounded** — discovery's outbound fetches now inherit the request context and a 30 s aggregate deadline (cancel on client disconnect, bounded work).
+- **Scheduler amplification cap** — per-feed processing is capped at the 200 newest items to prevent readability-fetch amplification.
+- **Prompt-injection hardening** — RSS-derived title/feed/excerpt sent to Claude (Ask and summaries) are wrapped in delimited untrusted-data blocks with escaping.
+- **Cache purge on logout** — the service worker evicts user-specific `/api/articles` and proxied-image responses on sign-out.
+
+### Fixed
+- **Regex hide-rules + pagination** — regex hide rules are now applied before paging, so the total count and every page are correct (previously articles were silently dropped and counts were wrong).
+- **"Mark all as read" scope** — now respects the active view/filter and the full result set instead of only the currently-loaded page.
+- **`published_after` validation** — an invalid value returns 400 instead of being silently forwarded and matching the wrong articles.
+- **Infinite scroll after dismiss** — `loadMore` tracks a page cursor instead of deriving the page from the mutated list, avoiding a wasted refetch and a possible skipped article.
+- **AI request cancellation** — a local timeout now maps to 504 and a client disconnect to a no-op (instead of a generic 502), and the OAuth token refresh honors the request deadline.
+- **Feed `/retry` dedup** — re-running a feed fetch no longer re-extracts already-stored articles.
+
 ## [1.0.3] - 2026-06-08
 
 ### Added

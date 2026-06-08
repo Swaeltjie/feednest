@@ -102,11 +102,12 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	if pa := r.URL.Query().Get("published_after"); pa != "" {
 		// Support relative durations like "24h", "7d", "1w" or RFC3339 strings
-		if parsed, err := parseRelativeOrAbsoluteTime(pa); err == nil {
-			filter.PublishedAfter = parsed.Format(time.RFC3339)
-		} else {
-			filter.PublishedAfter = pa
+		parsed, err := parseRelativeOrAbsoluteTime(pa)
+		if err != nil {
+			http.Error(w, `{"error":"invalid published_after"}`, http.StatusBadRequest)
+			return
 		}
+		filter.PublishedAfter = parsed.Format(time.RFC3339)
 	}
 	if mrt := r.URL.Query().Get("min_reading_time"); mrt != "" {
 		if v, err := strconv.Atoi(mrt); err == nil && v > 0 {

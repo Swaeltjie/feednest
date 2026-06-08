@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/feednest/backend/internal/api/handlers"
+	"github.com/feednest/backend/internal/apiutil"
 	"github.com/feednest/backend/internal/claude"
 	"github.com/feednest/backend/internal/scheduler"
 	"github.com/feednest/backend/internal/store"
@@ -88,18 +90,24 @@ func (rl *rateLimiter) allow(ip string) bool {
 func rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Use RemoteAddr only — X-Forwarded-For can be spoofed to bypass rate limiting.
-			// If behind a trusted reverse proxy, configure TRUSTED_PROXY_IPS to allow forwarded IPs.
-			ip := r.RemoteAddr
+			// Key on the port-stripped RemoteAddr so repeated connections from one
+			// client (each with a fresh ephemeral source port) share a bucket.
+			// X-Forwarded-For is only honored when RemoteAddr is a trusted proxy,
+			// since otherwise it can be spoofed to bypass rate limiting.
+			remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				remoteIP = r.RemoteAddr
+			}
+			ip := remoteIP
 			if trustedProxies := os.Getenv("TRUSTED_PROXY_IPS"); trustedProxies != "" {
-				remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
-				if err != nil {
-					remoteIP = r.RemoteAddr
-				}
 				for _, trusted := range strings.Split(trustedProxies, ",") {
 					if strings.TrimSpace(trusted) == remoteIP {
+						// The trusted proxy overwrites X-Forwarded-For with a single
+						// value (the real client), so take the right-most entry it
+						// appended rather than any value an attacker prepended.
 						if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-							ip = strings.TrimSpace(strings.SplitN(fwd, ",", 2)[0])
+							parts := strings.Split(fwd, ",")
+							ip = strings.TrimSpace(parts[len(parts)-1])
 						}
 						break
 					}
@@ -107,6 +115,23 @@ func rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Handler {
 			}
 			if !rl.allow(ip) {
 				http.Error(w, `{"error":"too many requests, please try again later"}`, http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// aiRateLimitMiddleware limits expensive Claude-backed endpoints per
+// authenticated user. It must run AFTER AuthMiddleware so the user ID is
+// present in the request context. Keying on the user (not IP) is required
+// because all authenticated traffic may share a single reverse-proxy IP.
+func aiRateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID := apiutil.ExtractUserID(r)
+			if !rl.allow(strconv.FormatInt(userID, 10)) {
+				http.Error(w, `{"error":"too many AI requests, please slow down"}`, http.StatusTooManyRequests)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -155,10 +180,12 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 	}
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   allowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
-		AllowCredentials: true,
+		AllowedOrigins: allowedOrigins,
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
+		// Auth is Bearer-token only (no cookies), so credentialed CORS buys
+		// nothing and is a foot-gun if ALLOWED_ORIGINS is misconfigured.
+		AllowCredentials: false,
 		MaxAge:           300,
 	}))
 
@@ -172,9 +199,11 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 	r.Get("/api/docs/openapi.yaml", openapiYAML)
 
 	// Image proxy — intentionally public so <img> tags (which cannot send a JWT)
-	// can route thumbnails through it. SSRF-protected and image-only.
+	// can route thumbnails through it. SSRF-protected and image-only. Rate-limited
+	// per-IP so the open proxy can't be abused for bandwidth/relay (120/min/IP).
 	imageH := handlers.NewImageHandler()
-	r.Get("/api/image", imageH.Proxy)
+	imageRL := newRateLimiter(1*time.Minute, 120)
+	r.With(rateLimitMiddleware(imageRL)).Get("/api/image", imageH.Proxy)
 
 	// AI summarization (Claude). Built once at startup; reads auth from env.
 	claudeClient := claude.New()
@@ -185,6 +214,10 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 
 	// Rate limiter for auth endpoints: 10 attempts per minute per IP
 	authRL := newRateLimiter(1*time.Minute, 10)
+
+	// Rate limiter for expensive Claude-backed endpoints: 10 calls per minute
+	// per authenticated user, bounding upstream API cost and concurrency.
+	aiRL := newRateLimiter(1*time.Minute, 10)
 
 	// Public routes
 	r.Group(func(r chi.Router) {
@@ -224,10 +257,14 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		r.Get("/api/articles/{id}", articlesH.Get)
 		r.Put("/api/articles/{id}", articlesH.Update)
 		r.Post("/api/articles/{id}/dismiss", articlesH.Dismiss)
-		r.Post("/api/articles/{id}/summary", summaryH.Summarize)
 		r.Get("/api/summary/config", summaryH.Config)
 
-		r.Post("/api/ask", askH.Ask)
+		// Expensive Claude-backed endpoints: rate-limit per authenticated user.
+		r.Group(func(r chi.Router) {
+			r.Use(aiRateLimitMiddleware(aiRL))
+			r.Post("/api/articles/{id}/summary", summaryH.Summarize)
+			r.Post("/api/ask", askH.Ask)
+		})
 
 		tagsH := handlers.NewTagHandler(queries)
 		r.Get("/api/tags", tagsH.List)

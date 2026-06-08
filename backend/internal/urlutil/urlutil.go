@@ -13,6 +13,30 @@ import (
 // AllowPrivate can be set to true in tests to skip the private IP check.
 var AllowPrivate bool
 
+// reservedCIDRs holds special-use ranges that the net.IP classifier methods
+// (IsLoopback/IsPrivate/IsLinkLocal*/IsUnspecified) do not cover but that
+// frequently route to internal infrastructure or can be used to bypass intent.
+// net.IPNet.Contains normalizes IPv4-in-IPv6 forms, so a range matches both
+// 4-byte and 16-byte parses. Built once at package init.
+var reservedCIDRs = func() []*net.IPNet {
+	nets := []*net.IPNet{}
+	for _, c := range []string{
+		"100.64.0.0/10",  // RFC 6598 CGNAT/shared address space (e.g. Tailscale default)
+		"192.0.0.0/24",   // RFC 6890 IETF protocol assignments
+		"198.18.0.0/15",  // RFC 2544 benchmarking
+		"240.0.0.0/4",    // reserved (class E), incl. 255.255.255.255
+		"64:ff9b::/96",   // RFC 6052 NAT64 well-known prefix (maps e.g. 169.254.169.254)
+		"64:ff9b:1::/48", // RFC 8215 NAT64 local-use prefix
+		// documentation ranges (defense-in-depth, non-routable):
+		"192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/32",
+	} {
+		if _, n, err := net.ParseCIDR(c); err == nil {
+			nets = append(nets, n)
+		}
+	}
+	return nets
+}()
+
 // IsSafeURL validates that a URL points to a public internet host,
 // blocking SSRF attempts against internal/private networks.
 func IsSafeURL(rawURL string) error {
@@ -59,7 +83,15 @@ func IsSafeURL(rawURL string) error {
 }
 
 func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified()
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		return true
+	}
+	for _, n := range reservedCIDRs {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // sharedTransport is a long-lived transport with SSRF-safe dialing and connection pooling.

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -51,8 +52,13 @@ func (h *DiscoverHandler) Discover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Bound total server-side work and propagate client disconnect to every
+	// outbound request derived from this context.
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
 	client := urlutil.SafeHTTPClient(15 * time.Second)
-	httpReq, err := http.NewRequest("GET", req.URL, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", req.URL, nil)
 	if err != nil {
 		http.Error(w, `{"error":"invalid URL"}`, http.StatusBadRequest)
 		return
@@ -142,12 +148,12 @@ func (h *DiscoverHandler) Discover(w http.ResponseWriter, r *http.Request) {
 
 	if len(feeds) == 0 {
 		// Stage 3: Scan <a> tags in page body for feed-like URLs (à la FreshRSS/SimplePie)
-		feeds = scanBodyLinks(html, req.URL, client)
+		feeds = scanBodyLinks(ctx, html, req.URL, client)
 	}
 
 	if len(feeds) == 0 {
 		// Stage 4: Probe common feed URL paths as last resort
-		feeds = probeFeedPaths(req.URL, client)
+		feeds = probeFeedPaths(ctx, req.URL, client)
 	}
 
 	if len(feeds) == 0 {
@@ -162,7 +168,7 @@ func (h *DiscoverHandler) Discover(w http.ResponseWriter, r *http.Request) {
 // scanBodyLinks scans all <a> tags in the HTML body for hrefs containing feed-related
 // keywords (rss, atom, feed, xml). Checks same-host first, then subdomains, then any domain.
 // This mirrors FreshRSS/SimplePie's ultra-liberal feed locator (steps 2-4).
-func scanBodyLinks(html, rawURL string, client *http.Client) []DiscoveredFeed {
+func scanBodyLinks(ctx context.Context, html, rawURL string, client *http.Client) []DiscoveredFeed {
 	base, err := url.Parse(rawURL)
 	if err != nil {
 		return nil
@@ -245,6 +251,9 @@ func scanBodyLinks(html, rawURL string, client *http.Client) []DiscoveredFeed {
 	var feeds []DiscoveredFeed
 	tried := 0
 	for _, c := range candidates {
+		if ctx.Err() != nil {
+			break
+		}
 		if tried >= 10 {
 			break
 		}
@@ -253,7 +262,7 @@ func scanBodyLinks(html, rawURL string, client *http.Client) []DiscoveredFeed {
 			continue
 		}
 
-		req, err := http.NewRequest("GET", c.url, nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", c.url, nil)
 		if err != nil {
 			continue
 		}
@@ -317,7 +326,7 @@ var commonFeedPaths = []string{
 }
 
 // probeFeedPaths tries common feed URL paths against the site's base URL.
-func probeFeedPaths(rawURL string, client *http.Client) []DiscoveredFeed {
+func probeFeedPaths(ctx context.Context, rawURL string, client *http.Client) []DiscoveredFeed {
 	base, err := url.Parse(rawURL)
 	if err != nil {
 		return nil
@@ -330,6 +339,9 @@ func probeFeedPaths(rawURL string, client *http.Client) []DiscoveredFeed {
 	seen := make(map[string]bool)
 
 	for _, path := range commonFeedPaths {
+		if ctx.Err() != nil {
+			break
+		}
 		candidate := origin + path
 		if seen[candidate] {
 			continue
@@ -340,7 +352,7 @@ func probeFeedPaths(rawURL string, client *http.Client) []DiscoveredFeed {
 			continue
 		}
 
-		req, err := http.NewRequest("GET", candidate, nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", candidate, nil)
 		if err != nil {
 			continue
 		}

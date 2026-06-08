@@ -30,6 +30,8 @@ func main() {
 	if jwtSecret == "" || jwtSecret == "change-me-in-production" {
 		// Auto-generate and persist a secure JWT secret
 		jwtSecret = loadOrGenerateSecret(filepath.Dir(dbPath))
+	} else if len(jwtSecret) < 32 {
+		log.Fatal("JWT_SECRET must be at least 32 characters; use a long, random value or leave it unset to auto-generate a secure key")
 	}
 
 	db, err := store.NewDB(dbPath)

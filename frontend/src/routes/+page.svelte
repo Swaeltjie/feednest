@@ -230,9 +230,45 @@
 	}
 
 	async function markAllRead() {
-		const unreadIds = $articles.articles.filter(a => !a.is_read).map(a => a.id);
-		if (unreadIds.length === 0) return;
-		await api.post('/api/articles/bulk', { action: 'mark_read', article_ids: unreadIds });
+		if (sidebarView === 'feed' && activeFeedId) {
+			await api.post('/api/articles/mark-all-read', { feed_id: activeFeedId });
+		} else if (sidebarView === 'category' && activeCategoryId) {
+			await api.post('/api/articles/mark-all-read', { category_id: activeCategoryId });
+		} else if (sidebarView === 'all' && !currentFilters.search && !currentFilters.tag) {
+			await api.post('/api/articles/mark-all-read', {});
+		} else {
+			// today/best_of/long_reads/search/tag: the backend mark-all-read endpoint
+			// only understands feed_id/category_id, so an empty body would over-mark
+			// articles outside the active view. Page through the full filtered result
+			// set and bulk-mark only the unread IDs that actually belong to this view.
+			const PAGE_SIZE = 30;
+			const unreadIds: number[] = [];
+			let page = 1;
+			while (true) {
+				const params = new URLSearchParams();
+				if (currentFilters.status) params.set('status', currentFilters.status);
+				params.set('sort', currentFilters.sort || 'smart');
+				if (currentFilters.feed) params.set('feed', String(currentFilters.feed));
+				if (currentFilters.category) params.set('category', String(currentFilters.category));
+				if (currentFilters.tag) params.set('tag', currentFilters.tag);
+				if (currentFilters.search) params.set('search', currentFilters.search);
+				if (currentFilters.published_after) params.set('published_after', currentFilters.published_after);
+				if (currentFilters.min_reading_time) params.set('min_reading_time', String(currentFilters.min_reading_time));
+				params.set('page', String(page));
+				const data = await api.get<{ articles: { id: number; is_read: boolean }[]; total: number }>(
+					`/api/articles?${params}`
+				);
+				const batch = data.articles || [];
+				for (const a of batch) {
+					if (!a.is_read) unreadIds.push(a.id);
+				}
+				if (batch.length < PAGE_SIZE || unreadIds.length >= data.total) break;
+				page++;
+			}
+			if (unreadIds.length > 0) {
+				await api.post('/api/articles/bulk', { action: 'mark_read', article_ids: unreadIds });
+			}
+		}
 		await Promise.all([articles.load(currentFilters), feeds.load()]);
 	}
 

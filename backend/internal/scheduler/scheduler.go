@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"log"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -10,6 +11,41 @@ import (
 	"github.com/feednest/backend/internal/readability"
 	"github.com/feednest/backend/internal/store"
 )
+
+// maxItemsPerFeed caps how many items a single feed can trigger processing for
+// in one fetch. gofeed will happily parse thousands of <item> entries out of a
+// (up to 10MB) feed body, and each NEW item triggers a synchronous
+// readability.Extract — a multi-strategy outbound HTTP fetch that can take tens
+// of seconds. Without a cap, a single feed (which an attacker only needs to get
+// a user to subscribe to) can make the server perform thousands of outbound
+// fetches and occupy a worker slot for hours, starving every other feed and
+// generating large amounts of outbound traffic (an amplification/SSRF-to-public
+// vector via the article URLs).
+const maxItemsPerFeed = 200
+
+// capItems keeps at most maxItemsPerFeed items, preferring the newest by
+// PublishedAt so the most relevant articles survive truncation. Items without a
+// PublishedAt sort last (treated as oldest) so dated items are never dropped in
+// favour of undated ones.
+func capItems(items []fetcher.FeedItem) []fetcher.FeedItem {
+	if len(items) <= maxItemsPerFeed {
+		return items
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		ti, tj := items[i].PublishedAt, items[j].PublishedAt
+		switch {
+		case ti == nil && tj == nil:
+			return false
+		case ti == nil:
+			return false
+		case tj == nil:
+			return true
+		default:
+			return ti.After(*tj)
+		}
+	})
+	return items[:maxItemsPerFeed]
+}
 
 type Scheduler struct {
 	store       *store.Queries
@@ -176,7 +212,17 @@ func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string, userID int64) {
 			}
 		}
 
+		// Cap items so a single (possibly hostile) feed cannot trigger
+		// thousands of outbound readability fetches in one go.
+		result.Items = capItems(result.Items)
+
 		for _, item := range result.Items {
+			// Skip readability extraction for articles that already exist so
+			// repeated /retry calls don't re-extract the entire feed.
+			if s.store.ArticleExistsByGUID(feedID, item.GUID) {
+				continue
+			}
+
 			thumbnailURL := item.ThumbnailURL
 			contentRaw := item.ContentRaw
 
@@ -263,6 +309,10 @@ func (s *Scheduler) fetchAll() {
 					log.Printf("scheduler: failed to update metadata for feed %d: %v", feedID, err)
 				}
 			}
+
+			// Cap items so a single (possibly hostile) feed cannot trigger
+			// thousands of outbound readability fetches in one go.
+			result.Items = capItems(result.Items)
 
 			newItems := 0
 			for _, item := range result.Items {

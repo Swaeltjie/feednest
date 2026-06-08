@@ -4,13 +4,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/feednest/backend/internal/urlutil"
 )
 
-const maxImageBytes = 10 * 1024 * 1024 // 10MB
+const maxImageBytes = 5 * 1024 * 1024 // 5MB
+
+// maxConcurrentFetches caps the number of in-flight outbound image fetches
+// across all callers. Because each fetch can pull up to maxImageBytes, an
+// unbounded number of concurrent requests would let a single client amplify
+// bandwidth/connection usage; this semaphore bounds that.
+const maxConcurrentFetches = 16
 
 // ImageHandler proxies remote article thumbnails through the backend. Browsers
 // block many otherwise-valid third-party images (Opaque Response Blocking,
@@ -22,6 +29,24 @@ const maxImageBytes = 10 * 1024 * 1024 // 10MB
 // urlutil.IsSafeURL on the initial URL and every redirect hop.
 type ImageHandler struct {
 	client *http.Client
+	// sem bounds the number of concurrent outbound fetches (see
+	// maxConcurrentFetches). Acquire by sending, release by receiving.
+	sem chan struct{}
+}
+
+// isAllowedPort restricts the destination port to the standard web ports so the
+// proxy cannot be used as a general TCP port prober. An empty port means the
+// scheme default (80/443), which is fine.
+func isAllowedPort(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	port := u.Port()
+	if port != "" && port != "80" && port != "443" {
+		return fmt.Errorf("port not allowed: %s", port)
+	}
+	return nil
 }
 
 // browserUA mimics a normal browser so hotlink protections that key on
@@ -39,9 +64,17 @@ func NewImageHandler() *ImageHandler {
 		if err := urlutil.IsSafeURL(req.URL.String()); err != nil {
 			return fmt.Errorf("unsafe redirect: %w", err)
 		}
+		// Enforce the port allowlist on every redirect hop too, so a redirect
+		// can't escape the initial-URL port check.
+		if err := isAllowedPort(req.URL.String()); err != nil {
+			return fmt.Errorf("unsafe redirect: %w", err)
+		}
 		return nil
 	}
-	return &ImageHandler{client: client}
+	return &ImageHandler{
+		client: client,
+		sem:    make(chan struct{}, maxConcurrentFetches),
+	}
 }
 
 func (h *ImageHandler) Proxy(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +85,21 @@ func (h *ImageHandler) Proxy(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := urlutil.IsSafeURL(raw); err != nil {
 		http.Error(w, `{"error":"url not allowed"}`, http.StatusForbidden)
+		return
+	}
+	if err := isAllowedPort(raw); err != nil {
+		http.Error(w, `{"error":"url not allowed"}`, http.StatusForbidden)
+		return
+	}
+
+	// Bound concurrent outbound fetches. Fail fast when saturated rather than
+	// blocking, so a flood can't pile up unbounded goroutines/connections.
+	// Acquired after the cheap validation above so bad requests don't burn a slot.
+	select {
+	case h.sem <- struct{}{}:
+		defer func() { <-h.sem }()
+	default:
+		http.Error(w, `{"error":"busy"}`, http.StatusServiceUnavailable)
 		return
 	}
 

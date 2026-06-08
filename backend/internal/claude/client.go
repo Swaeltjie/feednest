@@ -165,3 +165,80 @@ func (c *Client) Summarize(ctx context.Context, title, content string) (string, 
 	}
 	return out, nil
 }
+
+// Passage is one retrieved article excerpt passed to Answer for grounding. It
+// mirrors store.Passage but lives here so the claude package stays decoupled
+// from the store package (the API handler maps between the two).
+type Passage struct {
+	ID        int64
+	Title     string
+	URL       string
+	FeedTitle string
+	Excerpt   string
+}
+
+// Answer produces a grounded, cited answer to a question using only the
+// supplied passages (the user's own RSS subscriptions). It instructs the model
+// to cite inline as [n] and to admit when the feeds don't cover the question,
+// avoiding any outside knowledge. Returns ErrDisabled when no auth is
+// configured.
+func (c *Client) Answer(ctx context.Context, question string, passages []Passage) (string, error) {
+	if !c.enabled {
+		return "", ErrDisabled
+	}
+
+	system := []anthropic.TextBlockParam{}
+	if c.mode == "oauth" {
+		system = append(system, anthropic.TextBlockParam{Text: claudeCodeIdentity})
+	}
+	system = append(system, anthropic.TextBlockParam{Text: "You answer questions using ONLY the numbered excerpts provided below, which are drawn from the user's own RSS feed subscriptions. " +
+		"Cite every claim inline using the bracketed number of its source, like [1] or [2][3]. " +
+		"If the excerpts do not contain enough information to answer, say plainly that the user's feeds haven't covered it — do not guess or use any outside knowledge. " +
+		"Be concise and factual."})
+
+	// Build the numbered passage block, bounding total excerpt characters so we
+	// never blow the context budget. Mirrors the maxContentChars idea.
+	var pb strings.Builder
+	used := 0
+	for i, p := range passages {
+		excerpt := strings.TrimSpace(p.Excerpt)
+		remaining := maxContentChars - used
+		if remaining <= 0 {
+			break
+		}
+		if len([]rune(excerpt)) > remaining {
+			excerpt = string([]rune(excerpt)[:remaining])
+		}
+		used += len([]rune(excerpt))
+		if i > 0 {
+			pb.WriteString("\n\n")
+		}
+		fmt.Fprintf(&pb, "[%d] %s — %s\n%s", i+1, p.Title, p.FeedTitle, excerpt)
+	}
+
+	userPrompt := fmt.Sprintf("Question: %s\n\nExcerpts from your feeds:\n%s", question, pb.String())
+
+	msg, err := c.sdk.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.Model(c.model),
+		MaxTokens: 600,
+		System:    system,
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("claude answer: %w", err)
+	}
+
+	var sb strings.Builder
+	for _, block := range msg.Content {
+		if t, ok := block.AsAny().(anthropic.TextBlock); ok {
+			sb.WriteString(t.Text)
+		}
+	}
+	out := strings.TrimSpace(sb.String())
+	if out == "" {
+		return "", fmt.Errorf("claude returned an empty answer")
+	}
+	return out, nil
+}

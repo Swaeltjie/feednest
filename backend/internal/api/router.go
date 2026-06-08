@@ -179,6 +179,7 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 	// AI summarization (Claude). Built once at startup; reads auth from env.
 	claudeClient := claude.New()
 	summaryH := handlers.NewSummaryHandler(queries, claudeClient)
+	askH := handlers.NewAskHandler(queries, claudeClient)
 
 	auth := NewAuthHandler(queries, jwtSecret)
 
@@ -225,6 +226,8 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		r.Post("/api/articles/{id}/dismiss", articlesH.Dismiss)
 		r.Post("/api/articles/{id}/summary", summaryH.Summarize)
 		r.Get("/api/summary/config", summaryH.Config)
+
+		r.Post("/api/ask", askH.Ask)
 
 		tagsH := handlers.NewTagHandler(queries)
 		r.Get("/api/tags", tagsH.List)

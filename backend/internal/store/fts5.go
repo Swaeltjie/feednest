@@ -32,3 +32,30 @@ func buildFTSMatch(search string) string {
 	}
 	return strings.Join(tokens, " ")
 }
+
+// buildFTSMatchOR is like buildFTSMatch but OR-joins the tokens instead of
+// AND-ing them, trading precision for recall. It is used by passage retrieval
+// ("Ask Your Feeds") where surfacing any article mentioning any query term is
+// preferable to requiring all terms to co-occur. Tokenization and escaping are
+// identical to buildFTSMatch; returns "" when there is nothing searchable.
+func buildFTSMatchOR(search string) string {
+	fields := strings.Fields(search)
+	if len(fields) == 0 {
+		return ""
+	}
+	var tokens []string
+	for _, f := range fields {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		// Escape embedded double quotes by doubling them, then wrap as a
+		// quoted FTS5 string token so operators inside are treated literally.
+		escaped := strings.ReplaceAll(f, `"`, `""`)
+		tokens = append(tokens, `"`+escaped+`"`)
+	}
+	if len(tokens) == 0 {
+		return ""
+	}
+	return strings.Join(tokens, " OR ")
+}

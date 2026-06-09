@@ -132,6 +132,14 @@ func (h *OPMLHandler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cap imported entries: a 5MB OPML can carry tens of thousands of outlines,
+	// each becoming a feed the scheduler fetches forever. Bound the work.
+	const maxImport = 1000
+	totalEntries := len(feeds)
+	if len(feeds) > maxImport {
+		feeds = feeds[:maxImport]
+	}
+
 	// Pre-load existing categories to avoid N+1 queries
 	existingCats, err := h.store.ListCategories(userID)
 	if err != nil {
@@ -168,7 +176,12 @@ func (h *OPMLHandler) Import(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]int{"imported": imported, "total": len(feeds)})
+	json.NewEncoder(w).Encode(map[string]any{
+		"imported":  imported,
+		"total":     totalEntries,
+		"processed": len(feeds),
+		"truncated": totalEntries > len(feeds),
+	})
 }
 
 func (h *OPMLHandler) Export(w http.ResponseWriter, r *http.Request) {

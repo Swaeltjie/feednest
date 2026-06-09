@@ -191,12 +191,10 @@ func (q *Queries) GetHideRules(userID int64) ([]models.FilterRule, error) {
 	return rules, nil
 }
 
-func (q *Queries) ApplyAutoRules(userID, articleID, feedID int64, title, author, content string) error {
-	rules, err := q.GetRulesForFeed(userID, &feedID)
-	if err != nil {
-		return err
-	}
-
+// matchedAutoActions evaluates the auto_read/auto_star rules against an
+// article's fields and reports which flags should be set. Pure (no DB) so it
+// can be reused both by ApplyAutoRules and by the transactional create path.
+func matchedAutoActions(rules []models.FilterRule, title, author, content string) (autoRead, autoStar bool) {
 	for _, rule := range rules {
 		if rule.Action != "auto_read" && rule.Action != "auto_star" {
 			continue
@@ -228,22 +226,38 @@ func (q *Queries) ApplyAutoRules(userID, articleID, feedID int64, title, author,
 			}
 		}
 
-		if matched {
-			switch rule.Action {
-			case "auto_read":
-				isRead := true
-				if err := q.UpdateArticle(articleID, userID, &isRead, nil); err != nil {
-					return err
-				}
-			case "auto_star":
-				isStarred := true
-				if err := q.UpdateArticle(articleID, userID, nil, &isStarred); err != nil {
-					return err
-				}
-			}
+		if !matched {
+			continue
+		}
+		switch rule.Action {
+		case "auto_read":
+			autoRead = true
+		case "auto_star":
+			autoStar = true
 		}
 	}
+	return autoRead, autoStar
+}
 
+func (q *Queries) ApplyAutoRules(userID, articleID, feedID int64, title, author, content string) error {
+	rules, err := q.GetRulesForFeed(userID, &feedID)
+	if err != nil {
+		return err
+	}
+
+	autoRead, autoStar := matchedAutoActions(rules, title, author, content)
+	if autoRead {
+		isRead := true
+		if err := q.UpdateArticle(articleID, userID, &isRead, nil); err != nil {
+			return err
+		}
+	}
+	if autoStar {
+		isStarred := true
+		if err := q.UpdateArticle(articleID, userID, nil, &isStarred); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

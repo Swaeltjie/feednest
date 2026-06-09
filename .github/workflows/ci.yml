@@ -10,13 +10,21 @@ jobs:
   backend:
     name: Backend Tests
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test both search backends: the default build falls back to LIKE,
+        # while sqlite_fts5 exercises the FTS5 full-text path used in production.
+        tags: ["", "sqlite_fts5"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
-      - run: go test ./...
+      - run: go test -tags "${{ matrix.tags }}" ./...
         working-directory: backend
+        env:
+          CGO_ENABLED: "1"
 
   frontend:
     name: Frontend Checks

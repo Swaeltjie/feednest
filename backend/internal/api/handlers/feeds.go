@@ -50,12 +50,21 @@ func (h *FeedHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If new_category is provided, create it first
+	// If new_category is provided, create it first — or, if a category with
+	// that name already exists, use it (a UNIQUE collision previously left the
+	// feed silently uncategorized instead of assigning the named category).
 	if req.NewCategory != "" {
 		cat, err := h.store.CreateCategory(userID, req.NewCategory, 0)
 		if err == nil {
 			req.CategoryID = &cat.ID
-		} else if !strings.Contains(err.Error(), "UNIQUE constraint") {
+		} else if strings.Contains(err.Error(), "UNIQUE constraint") {
+			existing, gerr := h.store.GetCategoryByName(userID, req.NewCategory)
+			if gerr != nil {
+				http.Error(w, `{"error":"failed to resolve category"}`, http.StatusInternalServerError)
+				return
+			}
+			req.CategoryID = &existing.ID
+		} else {
 			http.Error(w, `{"error":"failed to create category"}`, http.StatusInternalServerError)
 			return
 		}

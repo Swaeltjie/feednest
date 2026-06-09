@@ -54,22 +54,37 @@ func (q *Queries) SearchPassages(userID int64, query string, limit int) ([]Passa
 		return passages, rows.Err()
 	}
 
-	// LIKE fallback: no FTS5 (or query had nothing searchable). Substring match
-	// over title and both content columns, newest-first.
-	if strings.TrimSpace(query) == "" {
+	// LIKE fallback: no FTS5 (or query had nothing searchable). Match articles
+	// containing ANY topical term (stopwords dropped via topicalTerms, exactly
+	// like the FTS OR-recall path) across title and both content columns,
+	// newest-first. Using the raw query as a single substring would require the
+	// whole natural-language question to appear verbatim and so retrieve
+	// nothing — the topical-term split is what lets "what have my feeds said
+	// about Rust lately?" still surface the Rust article.
+	terms := topicalTerms(query)
+	if len(terms) == 0 {
 		return nil, nil
 	}
-	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
-	term := "%" + escaped + "%"
+	escaper := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	const likeClause = `(a.title LIKE ? ESCAPE '\' OR a.content_clean LIKE ? ESCAPE '\' OR a.content_raw LIKE ? ESCAPE '\')`
+	clauses := make([]string, len(terms))
+	args := make([]any, 0, len(terms)*3+2)
+	args = append(args, userID)
+	for i, t := range terms {
+		clauses[i] = likeClause
+		like := "%" + escaper.Replace(t) + "%"
+		args = append(args, like, like, like)
+	}
+	args = append(args, limit)
 	rows, err := q.db.Query(`
 		SELECT a.id, COALESCE(a.title,''), COALESCE(a.url,''), COALESCE(f.title,''),
 		       COALESCE(a.content_clean, a.content_raw, '')
 		FROM articles a
 		JOIN feeds f ON a.feed_id = f.id
 		WHERE f.user_id = ?
-		  AND (a.title LIKE ? ESCAPE '\' OR a.content_clean LIKE ? ESCAPE '\' OR a.content_raw LIKE ? ESCAPE '\')
+		  AND (`+strings.Join(clauses, " OR ")+`)
 		ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
-		LIMIT ?`, userID, term, term, term, limit)
+		LIMIT ?`, args...)
 	if err != nil {
 		return nil, err
 	}

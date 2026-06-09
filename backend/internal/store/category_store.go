@@ -21,6 +21,20 @@ func (q *Queries) CreateCategory(userID int64, name string, position int) (*mode
 	return &models.Category{ID: id, UserID: userID, Name: name, Position: position}, nil
 }
 
+// GetCategoryByName looks up a user's category by its exact name, used to
+// resolve a feed's free-text "new category" to an existing one.
+func (q *Queries) GetCategoryByName(userID int64, name string) (*models.Category, error) {
+	var c models.Category
+	err := q.db.QueryRow(
+		"SELECT id, user_id, name, position FROM categories WHERE user_id = ? AND name = ?",
+		userID, name,
+	).Scan(&c.ID, &c.UserID, &c.Name, &c.Position)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 func (q *Queries) GetCategory(id, userID int64) (*models.Category, error) {
 	var c models.Category
 	err := q.db.QueryRow(

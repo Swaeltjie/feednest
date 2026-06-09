@@ -91,27 +91,35 @@ function createArticlesStore() {
 		async loadMore(filters: ArticleFilters = {}) {
 			let currentLength = 0;
 			let currentTotal = 0;
+			let isLoading = false;
 			update((s) => {
 				currentLength = s.articles.length;
 				currentTotal = s.total;
+				isLoading = s.loading;
 				return s;
 			});
 
+			// A load() (new filter) is in flight and will reset pagination — don't
+			// append a page derived from the soon-to-be-stale loadedPages. load()
+			// sets loading:true synchronously before its first await, so this
+			// closes the window for every caller (observer, "G" shortcut, button).
+			if (isLoading) return;
 			if (currentLength >= currentTotal) return;
 
 			const thisLoadMore = ++loadMoreId;
-			// Capture the current load generation so a concurrent load() that
-			// resets the list invalidates this in-flight loadMore.
+			// Capture the current load generation and page base so a concurrent
+			// load() that resets the list invalidates this in-flight loadMore.
 			const loadGen = loadId;
+			const basePages = loadedPages;
 			update((s) => ({ ...s, loadingMore: true }));
 
-			const nextPage = loadedPages + 1;
+			const nextPage = basePages + 1;
 			const params = buildParams(filters);
 			params.set('page', String(nextPage));
 
 			try {
 				const data = await api.get<ArticlesResponse>(`/api/articles?${params}`);
-				if (thisLoadMore !== loadMoreId || loadGen !== loadId) return;
+				if (thisLoadMore !== loadMoreId || loadGen !== loadId || basePages !== loadedPages) return;
 				loadedPages = nextPage;
 				update((s) => {
 					const existing = new Set(s.articles.map((a) => a.id));
@@ -124,7 +132,7 @@ function createArticlesStore() {
 					};
 				});
 			} catch {
-				if (thisLoadMore !== loadMoreId || loadGen !== loadId) return;
+				if (thisLoadMore !== loadMoreId || loadGen !== loadId || basePages !== loadedPages) return;
 				update((s) => ({ ...s, loadingMore: false }));
 			}
 		},

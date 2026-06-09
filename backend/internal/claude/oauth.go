@@ -47,9 +47,9 @@ type oauthProvider struct {
 // credentialsFile mirrors ~/.claude/.credentials.json. Claude Code has used
 // both a flat shape and one nested under "claudeAiOauth"; we accept either.
 type credentialsFile struct {
-	AccessToken  string          `json:"accessToken"`
-	RefreshToken string          `json:"refreshToken"`
-	ExpiresAt    json.RawMessage `json:"expiresAt"`
+	AccessToken   string          `json:"accessToken"`
+	RefreshToken  string          `json:"refreshToken"`
+	ExpiresAt     json.RawMessage `json:"expiresAt"`
 	ClaudeAiOAuth *struct {
 		AccessToken  string          `json:"accessToken"`
 		RefreshToken string          `json:"refreshToken"`
@@ -204,6 +204,12 @@ func (p *oauthProvider) doRefresh(ctx context.Context) error {
 	}
 	if tr.ExpiresIn > 0 {
 		p.expiresAt = time.Now().Add(time.Duration(tr.ExpiresIn) * time.Second)
+	} else {
+		// No expires_in in the response: assume a conservative lifetime so the
+		// fast path engages on subsequent calls. Otherwise expiresAt stays zero
+		// and every Claude request re-refreshes under the held mutex,
+		// serializing all AI traffic behind a token round-trip.
+		p.expiresAt = time.Now().Add(50 * time.Minute)
 	}
 	p.persist()
 	return nil

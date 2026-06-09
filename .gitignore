@@ -60,3 +60,6 @@ feed-state.jpeg
 # Local Claude OAuth creds + override (never commit)
 .claude-credentials.json
 docker-compose.override.yml
+
+# Claude Code workflow artifacts
+.claude/

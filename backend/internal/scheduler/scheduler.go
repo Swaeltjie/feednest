@@ -180,8 +180,18 @@ func (s *Scheduler) Stop() {
 }
 
 func (s *Scheduler) FetchFeedNow(feedID int64, feedURL string, userID int64) {
+	// Acquire the concurrency slot BEFORE spawning, non-blocking. The old code
+	// blocked on the semaphore inside the goroutine, so the semaphore bounded
+	// concurrency but not the number of spawned/blocked goroutines — an
+	// authenticated user spamming /api/feeds or /retry could pile up unbounded
+	// goroutines. Overflow is dropped; the periodic scheduler reconciles it.
+	select {
+	case s.fetchSem <- struct{}{}:
+	default:
+		log.Printf("scheduler: immediate fetch of feed %d dropped, fetch queue full", feedID)
+		return
+	}
 	go func() {
-		s.fetchSem <- struct{}{}
 		defer func() { <-s.fetchSem }()
 		defer func() {
 			if r := recover(); r != nil {
@@ -347,14 +357,18 @@ func (s *Scheduler) fetchAll() {
 					}
 				}
 
-				if _, err := s.store.CreateArticleAndApplyRules(
+				created, err := s.store.CreateArticleAndApplyRules(
 					userID, feedID, item.GUID, item.Title, item.URL, item.Author,
 					contentRaw, contentClean, thumbnailURL,
 					item.PublishedAt, item.WordCount, item.ReadingTime,
-				); err != nil {
+				)
+				if err != nil {
 					log.Printf("scheduler: failed to create article %q: %v", item.GUID, err)
+					continue
 				}
-				newItems++
+				if created {
+					newItems++
+				}
 			}
 
 			if err := s.store.ClearFeedError(feedID); err != nil {

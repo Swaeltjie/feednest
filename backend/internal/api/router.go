@@ -247,7 +247,10 @@ func NewRouter(queries *store.Queries, jwtSecret string, sched *scheduler.Schedu
 		r.Post("/api/feeds/{id}/retry", feedsH.Retry)
 
 		discoverH := handlers.NewDiscoverHandler()
-		r.Post("/api/feeds/discover", discoverH.Discover)
+		// Discovery fans out to many outbound requests per call; cap per-user
+		// (user-keyed, since authenticated traffic may share one proxy IP).
+		discoverRL := newRateLimiter(1*time.Minute, 20)
+		r.With(aiRateLimitMiddleware(discoverRL)).Post("/api/feeds/discover", discoverH.Discover)
 
 		articlesH := handlers.NewArticleHandler(queries)
 		r.Get("/api/articles", articlesH.List)

@@ -9,8 +9,8 @@ import (
 	"log"
 	"math"
 	"net/http"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -193,6 +193,23 @@ func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req models.UpdateArticleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.IsRead == nil && req.IsStarred == nil {
+		http.Error(w, `{"error":"no fields to update"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Verify ownership: UpdateArticle is user-scoped (no cross-user write), but
+	// without this a PUT to another user's / a nonexistent id returned 204 as
+	// if it succeeded. Mirror Dismiss for a consistent API contract.
+	if ok, err := h.store.ArticleBelongsToUser(id, userID); err != nil || !ok {
+		if errors.Is(err, sql.ErrNoRows) || !ok {
+			http.Error(w, `{"error":"article not found"}`, http.StatusNotFound)
+		} else {
+			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		}
 		return
 	}
 

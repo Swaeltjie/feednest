@@ -139,25 +139,30 @@ func (h *RulesHandler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"action must be one of: hide, auto_read, auto_star"}`, http.StatusBadRequest)
 		return
 	}
-	if req.Operator != nil && *req.Operator == "regex" && req.Value != nil {
-		if len(*req.Value) > 200 {
-			http.Error(w, `{"error":"regex pattern must not exceed 200 characters"}`, http.StatusBadRequest)
-			return
-		}
-		if _, err := regexp.Compile(*req.Value); err != nil {
-			http.Error(w, `{"error":"invalid regex pattern"}`, http.StatusBadRequest)
-			return
-		}
-	}
-	// If only value is being updated, check if existing rule uses regex operator
-	if req.Value != nil && req.Operator == nil {
+	// Validate the EFFECTIVE (operator, value) whenever the rule will be a regex
+	// rule after this update. This covers operator:"regex" sent WITHOUT a value
+	// (which previously slipped past both old checks), letting an invalid stored
+	// value be reinterpreted as a regex that then silently never matches.
+	if (req.Operator != nil && *req.Operator == "regex") || req.Value != nil {
 		existing, err := h.store.GetRule(id, userID)
 		if err != nil {
 			http.Error(w, `{"error":"rule not found"}`, http.StatusNotFound)
 			return
 		}
-		if existing.Operator == "regex" {
-			if _, err := regexp.Compile(*req.Value); err != nil {
+		effectiveOp := existing.Operator
+		if req.Operator != nil {
+			effectiveOp = *req.Operator
+		}
+		effectiveVal := existing.Value
+		if req.Value != nil {
+			effectiveVal = *req.Value
+		}
+		if effectiveOp == "regex" {
+			if len(effectiveVal) > 200 {
+				http.Error(w, `{"error":"regex pattern must not exceed 200 characters"}`, http.StatusBadRequest)
+				return
+			}
+			if _, err := regexp.Compile(effectiveVal); err != nil {
 				http.Error(w, `{"error":"invalid regex pattern"}`, http.StatusBadRequest)
 				return
 			}

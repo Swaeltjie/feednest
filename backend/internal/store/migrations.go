@@ -183,6 +183,16 @@ func setupFTS5(db *sql.DB) {
 		return
 	}
 
+	// Drop the previous unguarded AFTER UPDATE trigger on upgrade: it was created
+	// with IF NOT EXISTS so the guarded definition below would otherwise never
+	// replace it. The old trigger re-tokenized the full article body on EVERY
+	// row update (is_read/score/summary/thumbnail/etc.), needlessly holding the
+	// lone SQLite write connection during bulk mark-read and the 5-min rescore.
+	if _, err := db.Exec(`DROP TRIGGER IF EXISTS articles_fts_au`); err != nil {
+		log.Printf("FTS5 trigger upgrade warning: %v", err)
+		return
+	}
+
 	triggers := []string{
 		`CREATE TRIGGER IF NOT EXISTS articles_fts_ai AFTER INSERT ON articles BEGIN
 			INSERT INTO articles_fts(rowid, title, content)
@@ -191,7 +201,13 @@ func setupFTS5(db *sql.DB) {
 		`CREATE TRIGGER IF NOT EXISTS articles_fts_ad AFTER DELETE ON articles BEGIN
 			DELETE FROM articles_fts WHERE rowid = old.id;
 		END`,
-		`CREATE TRIGGER IF NOT EXISTS articles_fts_au AFTER UPDATE ON articles BEGIN
+		// Fire only when an FTS-indexed column actually changes. The IS NOT
+		// comparisons are NULL-safe, so a no-op text update won't re-tokenize.
+		`CREATE TRIGGER IF NOT EXISTS articles_fts_au AFTER UPDATE OF title, content_clean, content_raw ON articles
+			WHEN old.title IS NOT new.title
+			  OR old.content_clean IS NOT new.content_clean
+			  OR old.content_raw IS NOT new.content_raw
+		BEGIN
 			DELETE FROM articles_fts WHERE rowid = old.id;
 			INSERT INTO articles_fts(rowid, title, content)
 			VALUES (new.id, COALESCE(new.title,''), COALESCE(new.content_clean, new.content_raw, ''));

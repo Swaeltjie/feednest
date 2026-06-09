@@ -89,7 +89,7 @@ func (h *SummaryHandler) Summarize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.UpdateArticleSummary(id, summary); err != nil {
+	if err := h.store.UpdateArticleSummary(id, userID, summary); err != nil {
 		// Non-fatal: still return the freshly generated summary.
 		writeSummary(w, summary, false)
 		return

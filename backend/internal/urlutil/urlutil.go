@@ -63,8 +63,19 @@ func IsSafeURL(rawURL string) error {
 		return fmt.Errorf("localhost URLs are not allowed")
 	}
 
-	// Resolve hostname and check IP
-	ips, err := net.LookupHost(host)
+	// Restrict to the standard web ports so no outbound caller (feed fetch,
+	// discovery, OPML import, readability) can be coerced into probing
+	// arbitrary TCP ports on public hosts. An empty port = scheme default.
+	if p := u.Port(); p != "" && p != "80" && p != "443" {
+		return fmt.Errorf("port not allowed: %s", p)
+	}
+
+	// Resolve hostname and check IP. Bound the lookup so a hostile or slow
+	// resolver (e.g. a huge OPML import of bad hosts) can't pin the request
+	// goroutine indefinitely on a deadline-less net.LookupHost.
+	resolveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ips, err := net.DefaultResolver.LookupHost(resolveCtx, host)
 	if err != nil {
 		return fmt.Errorf("failed to resolve host %s: %w", host, err)
 	}
@@ -104,7 +115,13 @@ var sharedTransport = &http.Transport{
 		if err != nil {
 			return nil, err
 		}
-		ips, err := net.LookupHost(host)
+		// Enforce the port allowlist at connection time so a redirect hop
+		// (the default client follows up to 10 with no CheckRedirect) cannot
+		// re-target a non-web port.
+		if port != "80" && port != "443" {
+			return nil, fmt.Errorf("port not allowed: %s", port)
+		}
+		ips, err := net.DefaultResolver.LookupHost(ctx, host)
 		if err != nil {
 			return nil, err
 		}

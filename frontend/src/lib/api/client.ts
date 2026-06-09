@@ -36,8 +36,14 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 	});
 
 	if (res.status === 401 && accessToken) {
-		const refreshed = await refreshTokenFn();
-		if (refreshed) {
+		const result = await refreshTokenFn();
+		// Transient refresh failure (network blip / backend 5xx): do NOT destroy
+		// the still-valid refresh token. Surface a retryable error so a momentary
+		// outage coinciding with token expiry doesn't force a needless re-login.
+		if (result === 'transient') {
+			throw new Error('Temporary authentication error, please retry');
+		}
+		if (result === 'ok') {
 			headers['Authorization'] = `Bearer ${accessToken}`;
 			const retry = await fetch(`${API_BASE}${path}`, {
 				method,
@@ -45,8 +51,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 				body: body !== undefined ? JSON.stringify(body) : undefined,
 			});
 			// A 401 after a fresh token means the session is genuinely invalid —
-			// fall through to the session-expiry handling below instead of
-			// throwing a generic error and leaving the app in a broken state.
+			// fall through to the session-expiry handling below.
 			if (retry.status !== 401) {
 				if (!retry.ok) {
 					const err = await retry.json().catch(() => ({ error: `HTTP ${retry.status}` }));
@@ -56,7 +61,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 				return retry.json();
 			}
 		}
-		// Refresh failed (or retry still unauthorized) — clear auth state and redirect to login
+		// result === 'invalid' (or retry still 401): the refresh token is
+		// genuinely rejected — clear auth state and redirect to login.
 		if (typeof localStorage !== 'undefined') {
 			localStorage.removeItem('feednest_refresh_token');
 		}
@@ -76,9 +82,15 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 	return res.json();
 }
 
-let refreshPromise: Promise<boolean> | null = null;
+// RefreshResult distinguishes a definitively invalid session (purge creds and
+// log out) from a transient failure (network/5xx — keep creds, let the caller
+// retry). Collapsing both to one boolean previously logged users out on a
+// momentary blip even though their refresh token was still valid.
+type RefreshResult = 'ok' | 'invalid' | 'transient';
 
-async function refreshTokenFn(): Promise<boolean> {
+let refreshPromise: Promise<RefreshResult> | null = null;
+
+async function refreshTokenFn(): Promise<RefreshResult> {
 	if (refreshPromise) return refreshPromise;
 	refreshPromise = doRefresh().finally(() => {
 		refreshPromise = null;
@@ -86,10 +98,10 @@ async function refreshTokenFn(): Promise<boolean> {
 	return refreshPromise;
 }
 
-async function doRefresh(): Promise<boolean> {
-	if (typeof localStorage === 'undefined') return false;
+async function doRefresh(): Promise<RefreshResult> {
+	if (typeof localStorage === 'undefined') return 'invalid';
 	const refreshTok = localStorage.getItem('feednest_refresh_token');
-	if (!refreshTok) return false;
+	if (!refreshTok) return 'invalid';
 
 	try {
 		const res = await fetch(`${API_BASE}/api/auth/refresh`, {
@@ -97,15 +109,18 @@ async function doRefresh(): Promise<boolean> {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ refresh_token: refreshTok }),
 		});
-		if (!res.ok) return false;
+		// Only an explicit auth rejection invalidates the session; any other
+		// non-ok status is transient and must not clear the token.
+		if (res.status === 401 || res.status === 403) return 'invalid';
+		if (!res.ok) return 'transient';
 		const data = await res.json();
 		accessToken = data.access_token;
 		if (data.refresh_token) {
 			localStorage.setItem('feednest_refresh_token', data.refresh_token);
 		}
-		return true;
+		return 'ok';
 	} catch {
-		return false;
+		return 'transient';
 	}
 }
 

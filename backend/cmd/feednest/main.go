@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/feednest/backend/internal/api"
@@ -48,8 +51,37 @@ func main() {
 	router := api.NewRouter(queries, jwtSecret, sched)
 	defer sched.Stop()
 
-	log.Printf("FeedNest backend starting on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, router))
+	// Explicit timeouts defend against slow-header (Slowloris) connections that
+	// would otherwise hold request goroutines open forever. WriteTimeout is
+	// deliberately omitted: /api/ask runs a 60s Claude budget and a shorter
+	// server-wide WriteTimeout would truncate legitimate streamed answers.
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
+	go func() {
+		log.Printf("FeedNest backend starting on :%s", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	// Graceful shutdown: wait for SIGINT/SIGTERM, then drain in-flight requests
+	// so the deferred db.Close()/sched.Stop() actually run (log.Fatal previously
+	// os.Exit'd past them on every container stop).
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	<-sig
+	log.Println("shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("graceful shutdown error: %v", err)
+	}
 }
 
 // loadOrGenerateSecret reads a JWT secret from a file in dataDir, or generates

@@ -148,10 +148,32 @@ func (q *Queries) CreateArticle(feedID int64, guid, title, url, author, contentR
 	return err
 }
 
-// CreateArticleAndApplyRules creates an article and applies auto_read/auto_star rules.
-// Returns true if the article was newly inserted.
+// CreateArticleAndApplyRules creates an article and applies auto_read/auto_star
+// rules atomically. Returns true if the article was newly inserted.
+//
+// The insert and the rule-derived flag updates run in a single transaction so a
+// crash can't leave a persisted article with its auto_read/auto_star rules
+// un-applied (the scheduler then skips it forever via ArticleExistsByGUID).
+// Rules are read BEFORE Begin: with SetMaxOpenConns(1) a query issued while the
+// transaction holds the sole connection would deadlock.
 func (q *Queries) CreateArticleAndApplyRules(userID, feedID int64, guid, title, url, author, contentRaw, contentClean, thumbnailURL string, publishedAt *time.Time, wordCount, readingTime int) (bool, error) {
-	result, err := q.db.Exec(`
+	content := contentClean
+	if content == "" {
+		content = contentRaw
+	}
+	rules, err := q.GetRulesForFeed(userID, &feedID)
+	if err != nil {
+		return false, err
+	}
+	autoRead, autoStar := matchedAutoActions(rules, title, author, content)
+
+	tx, err := q.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(`
 		INSERT OR IGNORE INTO articles (feed_id, guid, title, url, author, content_raw, content_clean, thumbnail_url, published_at, word_count, reading_time)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		feedID, guid, title, url, author, contentRaw, contentClean, thumbnailURL, publishedAt, wordCount, readingTime,
@@ -165,7 +187,7 @@ func (q *Queries) CreateArticleAndApplyRules(userID, feedID int64, guid, title, 
 		return false, err
 	}
 	if rowsAffected == 0 {
-		return false, nil // article already existed
+		return false, tx.Commit() // article already existed — nothing to do
 	}
 
 	articleID, err := result.LastInsertId()
@@ -173,16 +195,18 @@ func (q *Queries) CreateArticleAndApplyRules(userID, feedID int64, guid, title, 
 		return true, err
 	}
 
-	// Apply auto rules for the newly created article
-	content := contentClean
-	if content == "" {
-		content = contentRaw
+	if autoRead {
+		if _, err := tx.Exec(`UPDATE articles SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE id = ?`, articleID); err != nil {
+			return true, err
+		}
 	}
-	if err := q.ApplyAutoRules(userID, articleID, feedID, title, author, content); err != nil {
-		return true, err
+	if autoStar {
+		if _, err := tx.Exec(`UPDATE articles SET is_starred = 1 WHERE id = ?`, articleID); err != nil {
+			return true, err
+		}
 	}
 
-	return true, nil
+	return true, tx.Commit()
 }
 
 func (q *Queries) GetArticle(id, userID int64) (*models.Article, error) {
@@ -259,7 +283,12 @@ func (q *Queries) ListArticles(userID int64, filter *ArticleFilter) ([]models.Ar
 		}
 	}
 	if filter.PublishedAfter != "" {
-		conditions = append(conditions, "COALESCE(a.published_at, a.fetched_at) >= ?")
+		// Normalize both sides with SQLite's datetime(): stored values are
+		// space-separated with a numeric offset (e.g. "2026-06-09 12:00:00+00:00")
+		// and may carry non-UTC offsets, while the threshold is RFC3339
+		// ("T"-separated, "Z"). A raw lexicographic compare drops every
+		// same-day row; datetime() parses and compares them correctly.
+		conditions = append(conditions, "datetime(COALESCE(a.published_at, a.fetched_at)) >= datetime(?)")
 		args = append(args, filter.PublishedAfter)
 	}
 	// Filter by reading time using word_count + user's personalized WPM,
@@ -525,9 +554,13 @@ func (q *Queries) UpdateArticleContent(id int64, contentClean string, wordCount,
 	return err
 }
 
-// UpdateArticleSummary stores a cached AI-generated TL;DR for an article.
-func (q *Queries) UpdateArticleSummary(id int64, summary string) error {
-	_, err := q.db.Exec(`UPDATE articles SET summary = ? WHERE id = ?`, summary, id)
+// UpdateArticleSummary stores a cached AI-generated TL;DR for an article,
+// scoped to the owning user so it can never write across tenants even if a
+// future caller skips the user-scoped GetArticle precheck.
+func (q *Queries) UpdateArticleSummary(id, userID int64, summary string) error {
+	_, err := q.db.Exec(
+		`UPDATE articles SET summary = ? WHERE id = ? AND feed_id IN (SELECT id FROM feeds WHERE user_id = ?)`,
+		summary, id, userID)
 	return err
 }
 

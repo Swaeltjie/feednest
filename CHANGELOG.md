@@ -5,6 +5,35 @@ All notable changes to FeedNest will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-06-09
+
+A correctness, security, and CI-hardening release from a full-codebase audit (multi-agent bug hunt with adversarial verification). No new features and no breaking changes.
+
+### Fixed
+- **`published_after` filtering was silently broken** — date-scoped views (Best Of's "last 7 days", any `?published_after=` query, relative `24h`/`7d`/`1w`) returned near-empty results and a wrong `total`. Stored timestamps are space-separated (`2026-06-09 12:00:00+00:00`) while the threshold was formatted RFC3339 (`T`-separated), and the two were compared lexicographically, so every same-day article sorted below the threshold and vanished. Both sides are now normalized with SQLite `datetime()` (offset-aware, so non-UTC feed timestamps compare correctly too). Added a regression test.
+- **"Ask Your Feeds" returned nothing without FTS5** — when the SQLite build lacked FTS5, the LIKE fallback matched the *entire raw question* as one substring (`%what have my feeds said about Rust lately?%`), so natural-language queries never matched. The fallback now tokenizes and drops stopwords exactly like the FTS path (shared `topicalTerms` helper), surfacing the topical terms.
+- **Transient backend blips logged users out** — a network error or 5xx coinciding with a routine access-token refresh destroyed the still-valid refresh token and forced re-login. Token refresh is now tri-state (`ok` / `invalid` / `transient`): only a definitive `401/403` clears credentials; transient failures surface a retryable error and keep the session.
+- **Article `PUT` returned 204 for non-existent / other users' IDs and empty bodies** — the update handler now verifies ownership (404 on miss, mirroring Dismiss) and rejects a body with no `is_read`/`is_starred` (400), instead of silently reporting success.
+- **Filter-rule regex validation gap** — sending `{"operator":"regex"}` with no value skipped the compile check, letting an invalid stored pattern become a regex that silently never matched. Validation now checks the *effective* operator+value (including operator-only updates).
+- **Adding a feed with an existing category name left it uncategorized** — naming an already-existing category in the "new category" field hit a UNIQUE collision and silently dropped the assignment; it now resolves to and uses the existing category.
+- **Article creation + auto-rules now atomic** — `auto_read`/`auto_star` rule application is committed in the same transaction as the article insert, so a crash mid-create can no longer leave a persisted article with its rules permanently un-applied.
+- **OAuth-mode AI refresh storm** — when the mounted credentials file omitted an expiry and a refresh returned no `expires_in`, every Claude request re-refreshed under the lock, serializing AI traffic; a conservative expiry is now assumed so the fast path engages.
+- **Scheduler "N new" over-count** — failed/duplicate inserts are no longer counted as new items in the per-feed fetch log.
+
+### Security
+- **Immediate-fetch goroutine flood** — `FetchFeedNow` (fired by add-feed and feed retry, both unrated) acquired its concurrency slot *inside* a freshly spawned goroutine, so spamming those endpoints piled up unbounded blocked goroutines. It now acquires the slot non-blocking *before* spawning and drops overflow (the periodic scheduler reconciles), and `POST /api/feeds/discover` (which fans out to ~26 outbound requests) is now per-user rate limited.
+- **Outbound port allowlist on all SSRF paths** — previously only the image proxy restricted destination ports; feed fetch, discovery, OPML import, and readability could be coerced into connecting to arbitrary TCP ports on public hosts (e.g. `:6379`). The port allowlist (80/443) is now enforced inside `IsSafeURL` and at connection time (covering redirect hops).
+- **Bounded outbound DNS** — SSRF host resolution now uses a 5 s context-bounded resolver instead of a deadline-less `net.LookupHost`, so a hostile/slow resolver (e.g. a large OPML of bad hosts) can't pin a request goroutine.
+- **OPML import bounded** — imports are capped at 1000 entries (a 5 MB OPML could otherwise create tens of thousands of feeds the scheduler fetches forever); the response now reports `total`/`processed`/`truncated`.
+- **HTTP server timeouts (Slowloris) + graceful shutdown** — the server now sets `ReadHeaderTimeout`/`ReadTimeout`/`IdleTimeout` (no `WriteTimeout`, so `/api/ask`'s streamed answers aren't truncated) and handles `SIGINT`/`SIGTERM` so `db.Close()`/`scheduler.Stop()` actually run on shutdown instead of being skipped by `log.Fatal`'s exit.
+- **Cached-summary write scoped to owner** — `UpdateArticleSummary` now scopes its write by feed ownership, closing a latent cross-tenant write should the user-scoped precheck ever be bypassed.
+- **SSR proxy header hygiene** — the `/api/*` reverse proxy strips upstream `content-encoding`/`content-length` and hop-by-hop headers (undici has already decoded the body), preventing `ERR_CONTENT_DECODING_FAILED`/truncation once backend compression or streaming is enabled.
+
+### Changed
+- **CI tests both search backends** — the backend test job now runs as a matrix over `["", "sqlite_fts5"]`, so both the LIKE fallback and the production FTS5 path are exercised (the gap that let the search regression reach `main`).
+- **FTS5 index no longer re-tokenizes on every row update** — the `AFTER UPDATE` trigger is now scoped to the indexed text columns with a NULL-safe `WHEN` guard (and the old unguarded trigger is dropped on upgrade), so bulk mark-read and the periodic rescore no longer needlessly re-index article bodies and hold the single SQLite write connection.
+- **`loadMore` pagination race** — infinite-scroll/"load more" now bails when a filter `load()` is in flight and guards the page base against concurrent resets, avoiding a skipped/duplicated page on fast filter switches.
+
 ## [1.0.4] - 2026-06-08
 
 ### Added

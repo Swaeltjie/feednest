@@ -20,10 +20,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 			duplex: 'half',
 		});
 
+		// undici has already decoded the upstream body, so forwarding the
+		// upstream content-encoding/content-length verbatim would mis-describe
+		// it (ERR_CONTENT_DECODING_FAILED / truncation) the moment the backend
+		// enables compression or streaming. Strip those plus hop-by-hop headers.
+		const outHeaders = new Headers(proxyResponse.headers);
+		for (const h of ['content-encoding', 'content-length', 'connection', 'transfer-encoding', 'keep-alive']) {
+			outHeaders.delete(h);
+		}
 		return new Response(proxyResponse.body, {
 			status: proxyResponse.status,
 			statusText: proxyResponse.statusText,
-			headers: proxyResponse.headers,
+			headers: outHeaders,
 		});
 	}
 

@@ -36,6 +36,39 @@ func TestArticleStore_CreateAndList(t *testing.T) {
 	}
 }
 
+func TestArticleStore_PublishedAfter(t *testing.T) {
+	q := setupTestDB(t)
+	userID := createTestUser(t, q)
+	feed, _ := q.CreateFeed(userID, "https://example.com/rss", "Feed", "", "", nil)
+
+	// noonUTC is the SAME calendar day as the threshold but later in the day.
+	// The bug compared the stored space-separated datetime against an RFC3339
+	// ("T"-separated) threshold lexicographically, so at index 10 ' ' (0x20) <
+	// 'T' (0x54) made every same-day row sort below the threshold and vanish.
+	noonUTC := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	dayBefore := time.Date(2026, 6, 8, 12, 0, 0, 0, time.UTC)
+	if err := q.CreateArticle(feed.ID, "g-today", "Today", "https://example.com/today", "", "", "<p>x</p>", "", &noonUTC, 100, 1); err != nil {
+		t.Fatalf("create today article: %v", err)
+	}
+	if err := q.CreateArticle(feed.ID, "g-old", "Yesterday", "https://example.com/old", "", "", "<p>x</p>", "", &dayBefore, 100, 1); err != nil {
+		t.Fatalf("create old article: %v", err)
+	}
+
+	threshold := time.Date(2026, 6, 9, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
+	articles, total, err := q.ListArticles(userID, &ArticleFilter{
+		Limit: 30, Page: 1, Sort: "newest", PublishedAfter: threshold,
+	})
+	if err != nil {
+		t.Fatalf("list articles: %v", err)
+	}
+	if total != 1 || len(articles) != 1 {
+		t.Fatalf("expected exactly the same-day article, got total=%d len=%d: %+v", total, len(articles), articles)
+	}
+	if articles[0].Title != "Today" {
+		t.Errorf("expected 'Today', got %q", articles[0].Title)
+	}
+}
+
 func TestMakeSnippet(t *testing.T) {
 	tests := []struct {
 		name   string
